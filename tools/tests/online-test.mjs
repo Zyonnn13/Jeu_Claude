@@ -1,12 +1,13 @@
 // Test du multijoueur en ligne : deux navigateurs (hôte + invité) jouent ensemble via un serveur
 // de mise en relation PeerJS local, en WebRTC réel.
 // Usage : npm run build, puis node tools/tests/online-test.mjs [duo|groupe|hote]
-// Nécessite Playwright (npm i -D playwright-core) et le paquet « peer » (npm i -D peer).
+// Le serveur de mise en relation local vient du paquet « peer » (outil du projet, installé par npm install).
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { launchBrowser } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -22,7 +23,6 @@ function load(ids) {
   }
   throw new Error(`Module introuvable : ${ids[0]}`);
 }
-const { chromium } = load(['playwright-core', 'playwright', '/opt/node-tools/node_modules/playwright']);
 const { ExpressPeerServer } = load(['peer', process.env.PEER_MODULE]);
 const express = load(['express', process.env.PEER_MODULE && path.join(process.env.PEER_MODULE, '../express')]);
 
@@ -42,10 +42,8 @@ await new Promise((resolve) => server.listen(PORT, '127.0.0.1', resolve));
 
 const page = pathToFileURL(path.join(ROOT, 'dist', 'index.html')).href;
 if (!fs.existsSync(path.join(ROOT, 'dist', 'index.html'))) throw new Error('Compilez d’abord le jeu : npm run build');
-const browser = await chromium.launch({
-  channel: process.platform === 'win32' ? 'msedge' : undefined,
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-features=WebRtcHideLocalIpsWithMdns', '--autoplay-policy=no-user-gesture-required'],
-});
+// Sans masquage mDNS des adresses locales, les navigateurs de la même machine se connectent directement.
+const browser = await launchBrowser({ args: ['--disable-features=WebRtcHideLocalIpsWithMdns'] });
 
 async function open(name, query) {
   const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
@@ -263,13 +261,14 @@ async function scenarioDuo() {
   let hostRelic = false;
   for (let i = 0; i < 400 && !(guestRelic && hostRelic); i++) {
     const tops = await Promise.all([guest, host].map((p) => p.evaluate(() => document.querySelector('#ui > .choice-screen:last-child')?.className ?? '')));
-    if (!guestRelic && tops[0].includes('relic')) {
+    if (!guestRelic && tops[0].includes('relic') && !tops[0].includes('locked')) {
+      // L'écran ignore les clics pendant ses 0,35 s de sécurité : on vérifie qu'il s'est bien fermé.
       await guest.locator('#ui > .choice-screen:last-child button', { hasText: 'Passer' }).click();
-      guestRelic = true;
+      guestRelic = await until(guest, () => !document.querySelector('#ui > .choice-screen:last-child')?.className.includes('relic'), undefined, 3000);
     } else if (tops[0].includes('levelup')) await pickTop(guest, levelUps.guest);
     if (!hostRelic && tops[1].includes('relic') && !tops[1].includes('locked')) {
       await host.locator('#ui > .choice-screen:last-child .choice-card').first().click();
-      hostRelic = true;
+      hostRelic = await until(host, () => !document.querySelector('#ui > .choice-screen:last-child')?.className.includes('relic'), undefined, 3000);
     } else if (tops[1].includes('levelup')) await pickTop(host, levelUps.host);
     await sleep(150);
   }

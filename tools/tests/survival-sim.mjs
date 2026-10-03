@@ -40,10 +40,10 @@
 //  node tools/tests/survival-sim.mjs --character mage --profile prudent --danger 3
 //  node tools/tests/survival-sim.mjs --mode waves --minutes 20 --character priestess   (comparaison avec les Manches)
 //  node tools/tests/survival-sim.mjs --endless 60 --ui-relic --shot fin                  (déroulé complet de la fin)
-import { createRequire } from 'node:module';
 import { existsSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { launchBrowser } from './browser.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -78,30 +78,13 @@ if (!['habile', 'prudent'].includes(opts.profile)) {
 const jsonOut = arg('json', null);
 const shotPrefix = arg('shot', null);
 
-// --- Playwright (installation locale, globale, ou celle de l'environnement de test) ---
-function loadPlaywright() {
-  const req = createRequire(import.meta.url);
-  for (const id of ['playwright-core', 'playwright', '/opt/node-tools/node_modules/playwright']) {
-    try {
-      return req(id);
-    } catch {
-      // Essai suivant.
-    }
-  }
-  throw new Error('Playwright introuvable (npm i -D playwright-core, ou installation globale).');
-}
-
 const page_ = resolve(root, 'dist/index.html');
 if (!existsSync(page_)) {
   console.error('dist/index.html absent : lancez d’abord `npm run build`.');
   process.exit(1);
 }
 
-const { chromium } = loadPlaywright();
-const browser = await chromium.launch({
-  headless: true,
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'],
-});
+const browser = await launchBrowser();
 
 let exitCode = 0;
 try {

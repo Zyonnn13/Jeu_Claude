@@ -23,9 +23,14 @@ Appuyez sur **F11** pour passer en plein écran (aussi dans Paramètres › Grap
 
 Double-cliquez sur **`Creer-exe.bat`** (il lance `npm run exe` ; Node.js nécessaire, comptez plusieurs minutes la première fois). Vous obtenez **`release\NuitEternelle.exe`** :
 
-- un **seul fichier portable**, avec l’icône du jeu, **sans installation** ;
-- il se lance sans Node.js ni navigateur et peut être copié tel quel sur un autre PC ;
-- `Jouer.bat` le démarre automatiquement dès qu’il existe.
+- un **seul fichier portable** (environ 90 Mo), avec l’icône du jeu, **sans installation** ;
+- il se lance sans Node.js ni navigateur et peut être copié tel quel sur un autre PC (pratique pour jouer en ligne avec des amis) ;
+- `Jouer.bat` le démarre automatiquement dès qu’il existe ;
+- **F11** ou **Alt+Entrée** passent en plein écran ; un seul exemplaire du jeu peut être ouvert à la fois.
+
+À chaque lancement, l’exe se décompresse en quelques secondes dans le dossier temporaire de Windows. `release\win-unpacked\Nuit Eternelle.exe` est le même jeu déjà décompressé (démarrage immédiat, mais il a besoin de tout son dossier). L’exe n’est pas signé : si Windows affiche « Windows a protégé votre ordinateur », cliquez sur **Informations complémentaires › Exécuter quand même**.
+
+Après une modification du jeu, relancez `Creer-exe.bat` : l’exe ne se met pas à jour tout seul. Le workflow GitHub Actions **Exe Windows** (onglet Actions, lancement manuel ou tag `v*`) fabrique aussi l’exe et le propose en téléchargement.
 
 **Attention :** la sauvegarde de la version .exe est **séparée** de celle de la version Edge. Pour garder votre progression, exportez-la depuis la version Edge (**Paramètres › Sauvegarde › Exporter la sauvegarde**), puis importez le fichier dans l’exe (**Importer une sauvegarde**).
 
@@ -68,9 +73,9 @@ Depuis le menu **Solo**, choisissez un mode, puis votre héros, puis la carte et
 ### Survie (10 min)
 
 - Des hordes **ininterrompues** qui changent et se renforcent chaque minute, avec des élites régulières et des encerclements.
-- **Reliques** à **2:30** et à **7:30**, plus une après le sous-boss. Contrairement aux Manches, ces pauses ne vous soignent pas.
+- **Reliques** à **1:40**, **3:20**, **6:40** et **8:20**, plus une après le sous-boss (5 en tout). Chacune rend **15 % de vos PV** (moitié moins en danger 4, rien en danger 5) et aspire les gemmes et l’or restés au sol.
 - **5:00** : un **sous-boss** apparaît (la Liche Ancestrale, ou le Roi Gluant dans la Forêt maudite).
-- **10:00** : **La Faucheuse** arrive et balaie tous les autres ennemis. La vaincre donne la victoire ; vous pouvez ensuite continuer dans une **nuit sans fin** où les hordes grossissent toujours plus.
+- **10:00** : **La Faucheuse** arrive et balaie tous les autres ennemis (même le sous-boss s’il est encore en vie) ; les gemmes au sol sont aspirées. La vaincre donne la victoire ; vous pouvez ensuite continuer dans une **nuit sans fin** où les hordes grossissent toujours plus.
 - Le record retenu est votre meilleur temps de survie.
 
 ### Défi du jour
@@ -114,6 +119,9 @@ Comment ça marche :
 - La connexion est **pair-à-pair (WebRTC)**. Le serveur public PeerJS ne sert qu’à la mise en relation : pas de compte, pas de serveur de jeu.
 - **Tout le monde doit avoir la même version du jeu**, sinon l’invité est refusé (« Version du jeu différente de celle de l’hôte »).
 - Chacun garde l’or gagné et profite de ses propres améliorations permanentes. Quand l’hôte met en pause, la partie s’arrête pour tout le monde.
+- Les choix de bonus se font **en même temps** : chaque joueur reçoit les siens un par un, sur son écran.
+- La partie continue si l’hôte **réduit sa fenêtre** ou passe sur une autre application. Si l’hôte se fige, les invités voient « L’hôte ne répond plus… ».
+- Quand un joueur ferme le jeu, les autres sont prévenus aussitôt ; s’il plante ou perd sa connexion, il est retiré au bout de **30 s** (et la partie s’arrête pour les invités si c’est l’hôte).
 
 **Votre propre serveur de mise en relation** (par exemple sur un réseau local, ou si le serveur public est injoignable) : ajoutez `?peer=hote:port` à l’adresse du jeu. Lancez un serveur PeerJS sur un PC du réseau :
 
@@ -121,13 +129,16 @@ Comment ça marche :
 npx -p peer peerjs --port 9000
 ```
 
+(depuis le dossier du jeu, après `npm install`, `npx peerjs --port 9000` suffit)
+
 puis chaque joueur ouvre le jeu dans son navigateur avec l’adresse `file:///C:/chemin/du/jeu/dist/index.html?peer=192.168.1.20:9000` (remplacez par l’adresse IP du PC qui fait tourner le serveur). Sans port, 9000 est utilisé ; avec le port 443, la connexion est sécurisée. Tous les joueurs doivent utiliser le même serveur.
 
 ### Coopération locale (jusqu’à 4 sur un écran)
 
-- **Multijoueur › Coopération locale** : un joueur au clavier (bouton « Rejoindre au clavier ») et les autres à la manette (chaque manette rejoint en appuyant sur **Y**). Chacun choisit son héros, puis vous choisissez le mode, la carte et le danger.
+- **Multijoueur › Coopération locale** : un joueur au clavier (bouton « Rejoindre au clavier ») et les autres à la manette (chaque manette rejoint en appuyant sur **Y**). Chacun choisit son héros, puis vous choisissez le mode, la carte et le danger. Start ne quitte pas le salon (B ou Échap pour revenir).
 - La caméra suit le groupe : restez ensemble !
-- L’expérience et l’or sont communs : quand l’équipe monte de niveau, chaque joueur choisit son propre bonus.
+- L’expérience et l’or sont communs : quand l’équipe monte de niveau, chaque joueur choisit à tour de rôle son propre bonus, dans sa couleur, **avec son clavier ou sa manette** (les autres ne peuvent pas choisir à sa place ; la souris reste utilisable par tous, et si sa manette est débranchée, n’importe qui peut répondre).
+- Tous les joueurs profitent des améliorations permanentes de la sauvegarde.
 - Plus il y a de joueurs, plus les ennemis sont nombreux et résistants.
 
 En coop locale comme en ligne, un joueur tombé à 0 PV est **à terre** : restez 2,5 s à côté de lui pour le **relever** (avec 35 % de ses PV). Les joueurs à terre se relèvent aussi au prochain choix de relique. La partie est perdue quand tout le monde est tombé.
@@ -350,21 +361,22 @@ Une fois satisfait :
 
 ## Tests automatisés
 
-Les scripts de `tools/tests/` jouent de vraies parties dans un navigateur sans fenêtre, pilotés par Playwright. Compilez d’abord le jeu (`npm run build`), puis :
+Les scripts de `tools/tests/` jouent de vraies parties dans un navigateur sans fenêtre, pilotés par Playwright (installé par `npm install`). Sous Windows, ils utilisent Microsoft Edge ; ailleurs, installez Chromium une fois avec `npx playwright-core install chromium`.
 
 | Commande | Ce qui est testé |
 | --- | --- |
-| `node tools/tests/survival-sim.mjs` | Un bot joue des parties de Survie pour vérifier l’équilibrage |
-| `node tools/tests/coop-test.mjs` | La coopération locale |
-| `node tools/tests/online-test.mjs` | Le multijoueur en ligne, avec un serveur PeerJS local |
+| `npm test` | Compile le jeu, puis lance les tests de coopération locale et du jeu en ligne |
+| `npm run test:coop` | Coopération locale : salon, manettes simulées, déplacements, choix de chaque joueur, joueur à terre, pause, fin de partie (≈ 30 s) |
+| `npm run test:online` | Jeu en ligne entre plusieurs navigateurs via un serveur PeerJS local : salon, discussion, partie, choix de bonus, pause, reliques, 4 joueurs, exclusion, fenêtre cachée, déconnexions et plantages (quelques minutes ; `-- duo`, `-- groupe` ou `-- hote` pour un seul scénario) |
+| `npm run sim:survie` | Un robot joue une partie de Survie pour vérifier l’équilibrage (options en tête du fichier, par exemple `npm run sim:survie -- --character knight --seed 3 --profile prudent`) |
 
-Il faut Playwright (`npm i -D playwright-core`) et un navigateur : Edge ou Chromium (`npx playwright-core install chromium`). Le test en ligne a aussi besoin du serveur PeerJS (`npm i -D peer`).
+Tous ces scripts testent la version compilée (`dist/index.html`) : relancez `npm run build` après une modification (`npm test` le fait pour vous).
 
 ## Sauvegarde
 
 La progression (or, améliorations, héros et contenus débloqués, succès, bestiaire, records, défi du jour) et les paramètres sont enregistrés automatiquement sur ce PC, dans le stockage local du navigateur (ou de l’exe).
 
-- La version Edge et la version .exe ont chacune **leur propre sauvegarde**.
+- La version Edge et la version .exe ont chacune **leur propre sauvegarde** (celle de l’exe est dans `%APPDATA%\Nuit Eternelle`).
 - **Paramètres › Sauvegarde › Exporter la sauvegarde** crée un fichier `nuit-eternelle-sauvegarde.json` ; **Importer une sauvegarde** le recharge, dans l’autre version ou sur un autre PC. L’import remplace la progression mais garde les paramètres de la machine.
 - Pensez à exporter votre sauvegarde avant de changer d’ordinateur ou de déplacer le jeu.
 - **Effacer la progression** (même onglet, avec confirmation) repart de zéro, en gardant les paramètres.

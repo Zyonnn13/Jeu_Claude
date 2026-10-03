@@ -4,22 +4,9 @@
 // Les manettes sont simulées en remplaçant navigator.getGamepads() (disposition standard, comme une
 // manette Xbox) ; le clavier est piloté par Playwright. La simulation est accélérée avec game.step(dt).
 // Affiche une liste PASS/FAIL et se termine avec le code 1 si un contrôle échoue.
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-
-const require = createRequire(import.meta.url);
-
-function loadPlaywright() {
-  for (const id of ['playwright-core', 'playwright', '/opt/node-tools/node_modules/playwright']) {
-    try {
-      return require(id);
-    } catch {
-      // module suivant
-    }
-  }
-  throw new Error('Playwright introuvable : installez-le (npm i -D playwright) ou ajustez le chemin dans ce script.');
-}
+import { launchBrowser } from './browser.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -87,11 +74,7 @@ function fakeGamepads() {
   Object.defineProperty(Navigator.prototype, 'getGamepads', { configurable: true, value: () => pads.map(snapshot) });
 }
 
-const { chromium } = loadPlaywright();
-const browser = await chromium.launch({
-  headless: !headed,
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'],
-});
+const browser = await launchBrowser({ headless: !headed });
 const errors = [];
 let exitCode = 1;
 try {
