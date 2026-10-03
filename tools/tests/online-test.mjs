@@ -48,7 +48,7 @@ const browser = await chromium.launch({
 });
 
 async function open(name, query) {
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
   const p = await ctx.newPage();
   p.on('pageerror', (e) => errors.push(`[${name}] ${e.message}`));
   p.on('console', (m) => m.type() === 'error' && !/WebSocket|stun|ICE|GL Driver/i.test(m.text()) && errors.push(`[${name}] ${m.text()}`));
@@ -89,6 +89,23 @@ async function joinLobby(p, name, code) {
   await setName(p, name);
   await p.fill('.code-input', code);
   await clickText(p, 'Rejoindre');
+}
+
+/**
+ * Choisit la première carte de l'écran de choix du dessus s'il est prêt. Renvoie l'identifiant du choix
+ * traité (chez l'invité, le numéro de demande de l'hôte), ou null.
+ */
+async function pickTop(p, done) {
+  const id = await p.evaluate(() => {
+    const top = document.querySelector('#ui > .choice-screen:last-child');
+    if (!top || top.classList.contains('locked') || !top.querySelector('.choice-card')) return null;
+    if (!top.dataset.testId) top.dataset.testId = String(Math.random());
+    return `${window.game.scene.choiceReq ?? ''}:${top.dataset.testId}:${top.className}`;
+  });
+  if (!id || done.has(id)) return null;
+  done.add(id);
+  await p.locator('#ui > .choice-screen:last-child .choice-card').first().click();
+  return id;
 }
 
 const playerCount = (p) => p.evaluate(() => document.querySelectorAll('.lobby-player:not(.empty)').length);
@@ -198,6 +215,24 @@ async function scenarioDuo() {
   const resumed = await until(guest, () => !document.querySelector('.choice-screen') && !document.querySelector('.net-wait'), undefined, 5000);
   check('La partie reprend chez l’invité après les choix', resumed, resumed ? '' : `invité : ${await uiState(guest)} · hôte : ${await uiState(host)}`);
 
+  // Trois niveaux d'un coup : chacun reçoit ses choix un par un et la partie reprend ensuite.
+  await host.evaluate(() => {
+    const w = window.game.scene.world;
+    for (let i = 0; i < 3; i++) w.addXp(w.run.xpNext - w.run.xp + 0.01, w.heroes[0]);
+  });
+  const doneGuest = new Set();
+  const doneHost = new Set();
+  let maxStack = 0;
+  for (let i = 0; i < 120 && (doneGuest.size < 3 || doneHost.size < 3); i++) {
+    maxStack = Math.max(maxStack, await guest.evaluate(() => document.querySelectorAll('#ui > .choice-screen').length));
+    await pickTop(guest, doneGuest);
+    await pickTop(host, doneHost);
+    await sleep(200);
+  }
+  const allResolved = await until(host, () => window.game.scene.remoteChoices.size === 0 && window.game.scene.world.uiQueue.length === 0 && !document.querySelector('.choice-screen'), undefined, 5000);
+  const guestFree = await until(guest, () => !document.querySelector('.choice-screen') && !document.querySelector('.net-wait'), undefined, 5000);
+  check('Trois niveaux d’un coup : 3 choix chacun, un écran à la fois', doneGuest.size === 3 && doneHost.size === 3 && maxStack === 1 && allResolved && guestFree, `invité ${doneGuest.size}, hôte ${doneHost.size}, écrans empilés max ${maxStack}${allResolved && guestFree ? '' : ` · ${await uiState(guest)}`}`);
+
   // Charge : 500 ennemis de plus (F7 en mode ?debug) ; l'invité doit suivre.
   await host.keyboard.press('F7');
   await sleep(2500);
@@ -222,28 +257,26 @@ async function scenarioDuo() {
   // Fin de manche : relique pour chacun.
   await host.keyboard.press('F2');
   // Les gemmes des ennemis abattus donnent d'abord des niveaux : chacun choisit ses bonus.
-  let relic = false;
-  let levelUps = 0;
-  for (let i = 0; i < 120 && !relic; i++) {
-    for (const p of [guest, host]) {
-      const variant = await p.evaluate(() => document.querySelector('#ui > .choice-screen:last-child:not(.locked)')?.className ?? '');
-      if (variant.includes('levelup')) {
-        await p.locator('.choice-screen .choice-card').first().click();
-        levelUps++;
-      }
-    }
-    relic = await guest.evaluate(() => document.querySelector('#ui > .choice-screen:last-child')?.className.includes('relic') ?? false);
-    if (!relic) await sleep(250);
+  // Les gemmes des ennemis abattus donnent d'abord des niveaux : chacun choisit ses bonus, puis sa relique.
+  const levelUps = { guest: new Set(), host: new Set() };
+  let guestRelic = false;
+  let hostRelic = false;
+  for (let i = 0; i < 400 && !(guestRelic && hostRelic); i++) {
+    const tops = await Promise.all([guest, host].map((p) => p.evaluate(() => document.querySelector('#ui > .choice-screen:last-child')?.className ?? '')));
+    if (!guestRelic && tops[0].includes('relic')) {
+      await guest.locator('#ui > .choice-screen:last-child button', { hasText: 'Passer' }).click();
+      guestRelic = true;
+    } else if (tops[0].includes('levelup')) await pickTop(guest, levelUps.guest);
+    if (!hostRelic && tops[1].includes('relic') && !tops[1].includes('locked')) {
+      await host.locator('#ui > .choice-screen:last-child .choice-card').first().click();
+      hostRelic = true;
+    } else if (tops[1].includes('levelup')) await pickTop(host, levelUps.host);
+    await sleep(150);
   }
-  if (levelUps) console.log(`      (${levelUps} montées de niveau choisies avant la relique)`);
-  check('Choix de relique proposé à l’invité en fin de manche', relic, relic ? '' : `invité : ${await uiState(guest)} · hôte : ${await uiState(host)}`);
-  if (relic) {
-    await guest.locator('.choice-screen button', { hasText: 'Passer' }).click();
-    const hostRelic = await until(host, () => document.querySelector('.choice-screen')?.className.includes('relic') ?? false, undefined, 5000);
-    if (hostRelic) await host.locator('.choice-screen .choice-card').first().click();
-    const wave2 = await until(host, () => window.game.scene.world.director.wave === 2, undefined, 10000);
-    check('Manche 2 lancée après les reliques des deux joueurs', wave2);
-  }
+  console.log(`      (${levelUps.guest.size} + ${levelUps.host.size} montées de niveau choisies avant les reliques)`);
+  check('Choix de relique proposé à chacun en fin de manche', guestRelic && hostRelic, guestRelic && hostRelic ? '' : `invité : ${await uiState(guest)} · hôte : ${await uiState(host)}`);
+  const wave2 = await until(host, () => window.game.scene.world.director.wave === 2, undefined, 15000);
+  check('Manche 2 lancée après les reliques des deux joueurs', wave2, wave2 ? '' : `invité : ${await uiState(guest)} · hôte : ${await uiState(host)}`);
 
   // Départ de l'invité : l'hôte continue seul.
   await guest.keyboard.press('Escape');

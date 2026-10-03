@@ -46,6 +46,8 @@ export class GameScene implements Scene {
   private killCounter = 0;
   private hostPaused = false;
   private waitEl: HTMLElement | null = null;
+  /** Dernier message « en attente de… » envoyé à chaque joueur distant. */
+  private readonly sentWait = new Map<number, string | null>();
 
   constructor(
     private readonly game: Game,
@@ -226,8 +228,7 @@ export class GameScene implements Scene {
     world.viewW = game.renderer.viewW;
     world.viewH = game.renderer.viewH;
     const localChoice = game.ui.top?.el.classList.contains('choice-screen') ?? false;
-    const blocked = this.hostPaused || localChoice || (!this.online && game.ui.isOpen);
-    if (world.uiQueue.length && !blocked) this.processQueue();
+    if (world.uiQueue.length && !this.hostPaused) this.processQueue(localChoice || (!this.online && game.ui.isOpen));
     if (!this.simulationPaused && !world.uiQueue.length) {
       world.heroes.forEach((h, i) => {
         const c = this.controllers[i];
@@ -269,38 +270,38 @@ export class GameScene implements Scene {
     return { title, subtitle: heal > 0 ? `Choisissez une relique · Vous récupérez ${heal}% de vos PV` : 'Choisissez une relique' };
   }
 
-  /** Traite les demandes en attente : choix locaux (un à la fois) et distants (en parallèle). */
-  private processQueue(): void {
+  /**
+   * Traite les demandes en attente. Chaque joueur reçoit ses choix un par un, dans l'ordre ; les joueurs
+   * distants choisissent en même temps que l'hôte. Avec `localBusy`, l'écran local est déjà occupé.
+   */
+  private processQueue(localBusy: boolean): void {
     const { world } = this;
-    // D'abord les choix des joueurs distants (ils choisissent tous en même temps)...
-    for (let i = 0; i < world.uiQueue.length; ) {
+    const busy = new Set([...this.remoteChoices.values()].map((c) => c.hero.index));
+    for (let i = 0; i < world.uiQueue.length; i++) {
       const req = world.uiQueue[i];
-      if (req.type !== 'gameover' && req.type !== 'victory' && this.host?.isRemote(req.hero)) {
-        world.uiQueue.splice(i, 1);
-        this.openRemoteChoice(req.type, world.heroes[req.hero]);
-      } else i++;
-    }
-    // ... puis les choix locaux, un à la fois.
-    while (world.uiQueue.length) {
-      const req = world.uiQueue[0];
       if (req.type === 'gameover' || req.type === 'victory') {
-        if (this.remoteChoices.size) return;
+        // La fin de partie attend que tous les choix en cours soient faits.
+        if (i > 0 || this.remoteChoices.size || localBusy) break;
         world.uiQueue.shift();
         this.openGlobal(req);
         return;
       }
-      world.uiQueue.shift();
       const hero = world.heroes[req.hero];
       if (!hero || hero.left) {
+        world.uiQueue.splice(i--, 1);
         if (req.type === 'relic') world.relicResolved();
         continue;
       }
       if (this.host?.isRemote(hero.index)) {
+        if (busy.has(hero.index)) continue;
+        world.uiQueue.splice(i--, 1);
+        busy.add(hero.index);
         this.openRemoteChoice(req.type, hero);
-        continue;
+      } else if (!localBusy) {
+        world.uiQueue.splice(i--, 1);
+        localBusy = true;
+        this.openLocalChoice(req.type, hero);
       }
-      this.openLocalChoice(req.type, hero);
-      return;
     }
     this.refreshWait();
   }
@@ -410,17 +411,21 @@ export class GameScene implements Scene {
   /** Message « en attente de... » pendant que des joueurs distants choisissent. */
   private refreshWait(): void {
     if (!this.host) return;
-    const names = [...this.remoteChoices.values()].map((c) => c.hero.name);
-    const localChoosing = this.game.ui.top?.el.classList.contains('choice-screen') ? this.world.heroes[0].name : null;
-    const all = [...new Set([...(localChoosing ? [localChoosing] : []), ...names])];
-    this.setWait(names.length && !localChoosing ? `En attente du choix de : ${names.join(', ')}…` : null);
+    const choosing = new Set([...this.remoteChoices.values()].map((c) => c.hero));
+    const localChoosing = this.game.ui.top?.el.classList.contains('choice-screen') ?? false;
+    if (localChoosing) choosing.add(this.world.heroes[0]);
+    const text = (heroes: Hero[]) => (heroes.length ? `En attente du choix de : ${heroes.map((h) => h.name).join(', ')}…` : null);
+    this.setWait(localChoosing ? null : text([...choosing]));
     for (const h of this.world.heroes) {
       if (!this.host.isRemote(h.index)) continue;
-      const others = all.filter((n) => n !== h.name);
-      const mine = [...this.remoteChoices.values()].some((c) => c.hero === h);
-      this.host.sendTo(h.index, { t: 'wait', text: !mine && others.length ? `En attente du choix de : ${others.join(', ')}…` : null });
+      const msg = choosing.has(h) ? null : text([...choosing]);
+      // Appelé à chaque image tant qu'un choix est en attente : on n'envoie que les changements.
+      if (this.sentWait.get(h.index) === msg) continue;
+      this.sentWait.set(h.index, msg);
+      this.host.sendTo(h.index, { t: 'wait', text: msg });
     }
   }
+
 
   private openGlobal(req: UiRequest): void {
     const { game, world } = this;
@@ -455,6 +460,9 @@ export class GameScene implements Scene {
           if (this.online) {
             this.hostPaused = false;
             this.host?.broadcast({ t: 'paused', paused: false });
+            // La reprise efface le message des invités : on renvoie l'attente en cours.
+            this.sentWait.clear();
+            this.refreshWait();
           }
         },
         abandon: () => this.endRun({ abandoned: true }),
