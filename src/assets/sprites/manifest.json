@@ -1,0 +1,532 @@
+{
+  "knight": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "mage": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "rogue": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "dwarf": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "priestess": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "alchemist": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "bat": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "slime": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "zombie": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "skeleton": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "ghost": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "eye": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "cultist": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "golem": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "spider": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "werewolf": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "armorKnight": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "gargoyle": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "brazier": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "reaper": {
+    "w": 32,
+    "h": 32,
+    "frames": 4
+  },
+  "lich": {
+    "w": 32,
+    "h": 32,
+    "frames": 4
+  },
+  "vampire": {
+    "w": 32,
+    "h": 32,
+    "frames": 4
+  },
+  "crown_boss": {
+    "w": 16,
+    "h": 8,
+    "frames": 1
+  },
+  "knife": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "axe": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "boomerang": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "flask": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "flame": {
+    "w": 16,
+    "h": 16,
+    "frames": 4
+  },
+  "bolt": {
+    "w": 12,
+    "h": 12,
+    "frames": 4
+  },
+  "orb": {
+    "w": 14,
+    "h": 14,
+    "frames": 4
+  },
+  "enemy_bullet": {
+    "w": 10,
+    "h": 10,
+    "frames": 2
+  },
+  "slash": {
+    "w": 32,
+    "h": 16,
+    "frames": 1
+  },
+  "gem_blue": {
+    "w": 8,
+    "h": 8,
+    "frames": 1
+  },
+  "gem_green": {
+    "w": 8,
+    "h": 8,
+    "frames": 1
+  },
+  "gem_red": {
+    "w": 8,
+    "h": 8,
+    "frames": 1
+  },
+  "gem_purple": {
+    "w": 8,
+    "h": 8,
+    "frames": 1
+  },
+  "coin": {
+    "w": 8,
+    "h": 8,
+    "frames": 1
+  },
+  "chicken": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "magnet": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "bomb": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "chest": {
+    "w": 16,
+    "h": 16,
+    "frames": 2
+  },
+  "icon_sword": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_wand": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_garlic": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_lightning": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_heart": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_shield": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_boots": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_gauntlet": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_lens": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_hourglass": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_ring": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_book": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_clover": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_crown": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_apple": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_potion": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_stone": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_feather": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_scroll": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_fang": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_spikes": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_amulet": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_skull": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_cloak": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_star": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_leaf": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "icon_phoenix": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "grass_0": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "grass_1": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "grass_2": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "dirt": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "deco_flowers": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "deco_pebbles": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "deco_tuft": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "deco_bones": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "deco_mushroom": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "prop_tombstone": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "prop_cross": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "prop_bush": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "prop_tree": {
+    "w": 32,
+    "h": 32,
+    "frames": 1
+  },
+  "prop_lantern": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "forest_0": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "forest_1": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "forest_2": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "mud": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "deco_fern": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "deco_leaves": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "deco_roots": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "deco_glowshroom": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "prop_glowshrooms": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "prop_stump": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "prop_rock": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "prop_pine": {
+    "w": 16,
+    "h": 32,
+    "frames": 1
+  },
+  "prop_oak": {
+    "w": 32,
+    "h": 32,
+    "frames": 1
+  },
+  "castle_0": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "castle_1": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "castle_2": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "castle_dark": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "deco_crack": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "deco_rubble": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "deco_blood": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  },
+  "prop_pillar": {
+    "w": 16,
+    "h": 32,
+    "frames": 1
+  },
+  "prop_candelabra": {
+    "w": 16,
+    "h": 32,
+    "frames": 1
+  },
+  "prop_statue": {
+    "w": 16,
+    "h": 32,
+    "frames": 1
+  },
+  "prop_brokencol": {
+    "w": 16,
+    "h": 16,
+    "frames": 1
+  }
+}
