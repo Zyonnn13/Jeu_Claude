@@ -319,6 +319,8 @@ export class GameScene implements Scene {
         title: texts.title,
         subtitle: texts.subtitle,
         accent: world.multiplayer ? hero.color : undefined,
+        // Coop locale : seul le clavier ou la manette de ce joueur peut choisir.
+        owner: this.controllers[hero.index] ?? undefined,
         offers: this.offersFor(kind, hero),
         rerolls: {
           remaining: () => hero.rerolls,

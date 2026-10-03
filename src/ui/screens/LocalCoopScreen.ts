@@ -23,6 +23,8 @@ export function localCoopScreen(game: Game): Screen {
   const label = (c: Controller) => (c.type === 'keyboard' ? 'Clavier' : c.type === 'pad' ? `Manette ${c.index + 1}` : 'Clavier/manette');
 
   const render = () => {
+    // Les boutons sont reconstruits : le focus (clavier / manette) reste ensuite sur le même bouton.
+    const focusKey = document.activeElement instanceof HTMLElement ? document.activeElement.dataset.key : undefined;
     grid.replaceChildren(
       ...[0, 1, 2, 3].map((i) => {
         const s = slots[i];
@@ -45,6 +47,8 @@ export function localCoopScreen(game: Game): Screen {
           slots.splice(i, 1);
           render();
         }, 'btn-small');
+        cycle.dataset.key = `hero${i}`;
+        remove.dataset.key = `remove${i}`;
         return h(
           'div',
           { class: 'coop-slot', style: { '--accent': HERO_COLORS[i] } },
@@ -77,7 +81,10 @@ export function localCoopScreen(game: Game): Screen {
       );
     }, 'btn-primary');
     if (!slots.length) start.classList.add('is-disabled');
+    joinKb.dataset.key = 'join';
+    modeBtn.dataset.key = 'mode';
     actions.replaceChildren(joinKb, modeBtn, start, button('Retour', () => game.ui.pop()));
+    if (focusKey) el.querySelector<HTMLElement>(`[data-key="${focusKey}"]`)?.focus({ preventScroll: true });
   };
 
   let offPad: (() => void) | null = null;
@@ -90,12 +97,15 @@ export function localCoopScreen(game: Game): Screen {
     actions,
   );
   render();
-  return {
+  const screen: Screen = {
     el,
     onBack: () => game.ui.pop(),
+    // Start ne quitte pas le salon : les joueurs y perdraient leur place.
+    onPause: () => undefined,
     onMount: () => {
       offPad = game.input.onPadButton((pad, b) => {
-        if (b !== 3 || slots.length >= 4 || slots.some((s) => s.control.type === 'pad' && s.control.index === pad)) return;
+        // Seulement sur cet écran (pas sur l'écran de carte ouvert par-dessus).
+        if (b !== 3 || game.ui.top !== screen || slots.length >= 4 || slots.some((s) => s.control.type === 'pad' && s.control.index === pad)) return;
         slots.push({ control: { type: 'pad', index: pad }, character: unlocked()[slots.length % unlocked().length].id });
         game.audio.play('select');
         render();
@@ -104,4 +114,5 @@ export function localCoopScreen(game: Game): Screen {
     onUnmount: () => offPad?.(),
     onReroll: () => undefined,
   };
+  return screen;
 }

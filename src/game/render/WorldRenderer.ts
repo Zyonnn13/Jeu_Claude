@@ -378,7 +378,8 @@ export class WorldRenderer {
       if (pk.kind === 'chest' && !view.isInView(pk.x, pk.y, -10)) targets.push({ x: pk.x, y: pk.y, icon: 'chest', color: '#ffd84a' });
     }
     for (const h of heroes) {
-      if (h.index === view.localHeroIndex || (h.dead && !h.downed)) continue;
+      // Le héros local à terre aussi : en coop locale, la caméra partagée suit les survivants.
+      if ((h.index === view.localHeroIndex && !h.downed) || (h.dead && !h.downed)) continue;
       if (!view.isInView(h.x, h.y, -10)) targets.push({ x: h.x, y: h.y, icon: h.downed ? 'prop_tombstone' : h.sprite, color: h.color });
     }
     if (!targets.length) return;

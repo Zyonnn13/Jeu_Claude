@@ -61,13 +61,20 @@ const KEY_NAMES: Record<string, string> = {
   CapsLock: 'Verr. Maj',
 };
 
-/** Renvoyer `true` indique que l'action a été consommée : les actions suivantes de la même touche sont ignorées. */
-type ActionListener = (action: Action, event?: KeyboardEvent) => boolean | void;
+/**
+ * Renvoyer `true` indique que l'action a été consommée : les actions suivantes de la même touche sont ignorées.
+ * `source` : clavier ou manette d'origine (la coop locale réserve un écran de choix à un seul joueur).
+ */
+type ActionListener = (action: Action, event?: KeyboardEvent, source?: Controller) => boolean | void;
+/** Renvoyer `true` indique que la touche a été utilisée : elle ne déclenche alors aucune action. */
+type KeyListener = (e: KeyboardEvent) => boolean | void;
 
 export type Device = 'keyboard' | 'gamepad';
 
 /** Source de commandes d'un joueur local. */
 export type Controller = { type: 'any' } | { type: 'keyboard' } | { type: 'pad'; index: number };
+
+const KEYBOARD: Controller = { type: 'keyboard' };
 
 interface PadState {
   buttons: Set<number>;
@@ -79,8 +86,9 @@ export class Input {
   private pads = new Map<number, PadState>();
   private padListeners = new Set<(padIndex: number, button: number) => void>();
   private listeners = new Set<ActionListener>();
-  private keyListeners = new Set<(e: KeyboardEvent) => void>();
-  private padRepeat = { dir: '', timer: 0 };
+  private keyListeners = new Set<KeyListener>();
+  /** Répétition de la navigation au stick, par manette. */
+  private padRepeat = new Map<number, { dir: string; timer: number }>();
   private bindings: Bindings = structuredClone(DEFAULT_BINDINGS);
   private capture: ((code: string | null) => void) | null = null;
   private layout = new Map<string, string>();
@@ -100,15 +108,17 @@ export class Input {
       // Saisie de texte (pseudo, code de partie, discussion) : seules Entrée et Échap restent des commandes.
       const typing = e.target instanceof HTMLInputElement && (e.target.type === 'text' || e.target.type === 'search');
       if (typing) {
-        if (e.code === 'Enter' || e.code === 'NumpadEnter') this.dispatch('confirm', e);
-        else if (e.code === 'Escape') this.dispatch('back', e);
+        if (e.code === 'Enter' || e.code === 'NumpadEnter') this.dispatch('confirm', e, KEYBOARD);
+        else if (e.code === 'Escape') this.dispatch('back', e, KEYBOARD);
         return;
       }
       if (PREVENT_DEFAULT.has(e.code) && !(e.target instanceof HTMLInputElement)) e.preventDefault();
       this.keys.add(e.code);
-      for (const fn of this.keyListeners) fn(e);
-      if (e.repeat && !this.isNavigation(e.code)) return;
-      for (const action of this.actionsFor(e.code)) if (this.dispatch(action, e)) break;
+      // Une touche utilisée par un raccourci (ex. écran-titre) ne valide pas en plus l'écran suivant.
+      let used = false;
+      for (const fn of this.keyListeners) if (fn(e)) used = true;
+      if (used || (e.repeat && !this.isNavigation(e.code))) return;
+      for (const action of this.actionsFor(e.code)) if (this.dispatch(action, e, KEYBOARD)) break;
     });
     target.addEventListener('keyup', (e) => this.keys.delete(e.code));
     target.addEventListener('blur', () => this.keys.clear());
@@ -168,8 +178,8 @@ export class Input {
     return out;
   }
 
-  private dispatch(action: Action, event?: KeyboardEvent): boolean {
-    for (const fn of [...this.listeners]) if (fn(action, event)) return true;
+  private dispatch(action: Action, event: KeyboardEvent | undefined, source: Controller): boolean {
+    for (const fn of [...this.listeners]) if (fn(action, event, source)) return true;
     return false;
   }
 
@@ -180,7 +190,7 @@ export class Input {
   }
 
   /** Écoute brute du clavier (raccourcis numériques des menus, debug...). */
-  onKey(fn: (e: KeyboardEvent) => void): () => void {
+  onKey(fn: KeyListener): () => void {
     this.keyListeners.add(fn);
     return () => this.keyListeners.delete(fn);
   }
@@ -266,10 +276,9 @@ export class Input {
   poll(dt: number): void {
     const pads = this.gamepads();
     const seen = new Set<number>();
-    let ax = 0;
-    let ay = 0;
     for (const pad of pads) {
       seen.add(pad.index);
+      const source: Controller = { type: 'pad', index: pad.index };
       const prev = this.pads.get(pad.index);
       const pressed = new Set<number>();
       pad.buttons.forEach((b, i) => {
@@ -279,7 +288,7 @@ export class Input {
       for (const b of pressed) if (!prev?.buttons.has(b)) for (const fn of this.padListeners) fn(pad.index, b);
       for (const action of Object.keys(PAD_BUTTONS) as Action[]) {
         for (const b of PAD_BUTTONS[action] ?? []) {
-          if (pressed.has(b) && !prev?.buttons.has(b) && this.dispatch(action)) break;
+          if (pressed.has(b) && !prev?.buttons.has(b) && this.dispatch(action, undefined, source)) break;
         }
       }
       const dead = 0.22;
@@ -288,24 +297,26 @@ export class Input {
       const axes = { x: Math.abs(x) > dead ? x : 0, y: Math.abs(y) > dead ? y : 0 };
       if (axes.x || axes.y) this.setDevice('gamepad');
       this.pads.set(pad.index, { buttons: pressed, axes });
-      if (!ax && !ay) {
-        ax = x;
-        ay = y;
+
+      // Navigation des menus au stick, avec répétition (chaque manette séparément : un stick
+      // incliné sur une manette n'empêche pas les autres de naviguer).
+      const dir = Math.abs(x) > 0.6 ? (x > 0 ? 'right' : 'left') : Math.abs(y) > 0.6 ? (y > 0 ? 'down' : 'up') : '';
+      const repeat = this.padRepeat.get(pad.index);
+      if (dir !== (repeat?.dir ?? '')) {
+        this.padRepeat.set(pad.index, { dir, timer: 0.35 });
+        if (dir) this.dispatch(dir as Action, undefined, source);
+      } else if (dir && repeat) {
+        repeat.timer -= dt;
+        if (repeat.timer <= 0) {
+          repeat.timer = 0.12;
+          this.dispatch(dir as Action, undefined, source);
+        }
       }
     }
-    for (const index of [...this.pads.keys()]) if (!seen.has(index)) this.pads.delete(index);
-
-    // Navigation des menus au stick, avec répétition.
-    const dir = Math.abs(ax) > 0.6 ? (ax > 0 ? 'right' : 'left') : Math.abs(ay) > 0.6 ? (ay > 0 ? 'down' : 'up') : '';
-    if (dir !== this.padRepeat.dir) {
-      this.padRepeat = { dir, timer: 0.35 };
-      if (dir) this.dispatch(dir as Action);
-    } else if (dir) {
-      this.padRepeat.timer -= dt;
-      if (this.padRepeat.timer <= 0) {
-        this.padRepeat.timer = 0.12;
-        this.dispatch(dir as Action);
-      }
+    for (const index of [...this.pads.keys()]) {
+      if (seen.has(index)) continue;
+      this.pads.delete(index);
+      this.padRepeat.delete(index);
     }
   }
 }
