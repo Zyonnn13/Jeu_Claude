@@ -15,7 +15,7 @@ import { dateKey } from '../core/Daily';
 import type { Hero } from '../game/Hero';
 import { WorldRenderer } from '../game/render/WorldRenderer';
 import { killEnemy, spawnPickup } from '../game/systems/Combat';
-import { SurvivalDirector } from '../game/systems/SurvivalDirector';
+import { SURVIVAL_RELIC_HEAL, SurvivalDirector } from '../game/systems/SurvivalDirector';
 import { chestOffers, levelUpOffers, offerView, relicOffers, type Offer } from '../game/systems/Upgrades';
 import { World, type UiRequest } from '../game/World';
 import { HostSession } from '../net/HostSession';
@@ -263,9 +263,10 @@ export class GameScene implements Scene {
     const who = w.multiplayer ? `${hero.name} — ` : '';
     if (kind === 'levelup') return { title: `${who}Niveau supérieur !`, subtitle: `Niveau ${w.run.level} · Choisissez une amélioration` };
     if (kind === 'chest') return { title: `${who}Coffre au trésor !`, subtitle: `+${gold} or · Choisissez un trésor` };
-    const heal = Math.round(BALANCE.waveHeal * w.mods.waveHeal * 100);
-    const title = w.director.mode === 'survival' ? `${who}Relique !` : `${who}Manche ${w.director.wave} terminée !`;
-    return { title, subtitle: heal > 0 && w.director.mode === 'waves' ? `Choisissez une relique · Vous récupérez ${heal}% de vos PV` : 'Choisissez une relique' };
+    const survival = w.director.mode === 'survival';
+    const heal = Math.round((survival ? SURVIVAL_RELIC_HEAL : BALANCE.waveHeal) * w.mods.waveHeal * 100);
+    const title = survival ? `${who}Relique !` : `${who}Manche ${w.director.wave} terminée !`;
+    return { title, subtitle: heal > 0 ? `Choisissez une relique · Vous récupérez ${heal}% de vos PV` : 'Choisissez une relique' };
   }
 
   /** Traite les demandes en attente : choix locaux (un à la fois) et distants (en parallèle). */

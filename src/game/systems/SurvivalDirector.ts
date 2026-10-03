@@ -1,14 +1,19 @@
 // Mode « Survie » : 10 minutes de vagues continues de plus en plus fortes,
-// un sous-boss à 5:00 et le méga-boss (La Faucheuse) à 10:00. Reliques à 2:30, 7:30 et après le sous-boss.
+// un sous-boss à 5:00 et le méga-boss (La Faucheuse) à 10:00.
+// Sans fin de manche pour souffler, ce mode compense autrement : une relique à 1:40, 3:20, 6:40, 8:20 et après
+// le sous-boss, chacune avec un petit soin, et les gemmes restées au sol sont aspirées (aussi à l'arrivée de La Faucheuse).
+import { BALANCE } from '../../data/balance';
 import { getEnemy } from '../../data/enemies';
 import { formatTime } from '../../engine/math';
 import type { World } from '../World';
-import { killEnemy } from './Combat';
+import { healPlayer, killEnemy } from './Combat';
 import { playerScale, spawnAroundHero, type Director, type DirectorHud, type WavePhase } from './Director';
 
 const SUB_BOSS_AT = 300;
 const MEGA_BOSS_AT = 600;
-const RELIC_MARKS = [150, 450];
+const RELIC_MARKS = [100, 200, 400, 500];
+/** Soin (fraction des PV max) après chaque relique : 15 % contre 25 % entre deux manches, réduit par le danger. */
+export const SURVIVAL_RELIC_HEAL = BALANCE.waveHeal * 0.6;
 
 /** Ennemis possibles selon la minute écoulée. */
 const POOLS: [string, number][][] = [
@@ -71,13 +76,14 @@ export class SurvivalDirector implements Director {
     // Difficulté équivalente aux manches : ~15 à 10 minutes.
     this.wave = 1 + Math.floor(this.elapsed / 42);
 
-    // Reliques intermédiaires.
+    // Reliques intermédiaires (y compris pendant le combat contre le sous-boss).
     for (const mark of RELIC_MARKS) {
-      if (this.elapsed >= mark && !this.relicsDone.has(mark) && this.stage === 'normal') {
+      if (this.elapsed >= mark && !this.relicsDone.has(mark) && (this.stage === 'normal' || this.stage === 'subBoss')) {
         this.relicsDone.add(mark);
         this.phase = 'waiting';
         w.audio.play('wave');
         w.events.emit('survival:milestone', { text: 'Relique !' });
+        this.collectGems();
         w.grantRelicChoice();
         return;
       }
@@ -90,8 +96,10 @@ export class SurvivalDirector implements Director {
     }
     if ((this.stage === 'normal' || this.stage === 'subBoss') && this.elapsed >= MEGA_BOSS_AT) {
       this.stage = 'megaBoss';
-      // La Faucheuse balaie tout sur son passage.
-      for (const e of w.enemies) if (!e.isProp && !e.dead && !e.isBoss) killEnemy(w, e, { cause: 'waveEnd' });
+      // La Faucheuse balaie tout sur son passage, y compris un sous-boss encore en vie (sans récompense).
+      for (const e of w.enemies) if (!e.isProp && !e.dead) killEnemy(w, e, { cause: 'waveEnd', drops: !e.isBoss });
+      for (const b of w.bullets) b.dead = true;
+      w.defer(() => this.collectGems());
       w.events.emit('survival:milestone', { text: 'La Faucheuse arrive…' });
       w.spawnBoss(getEnemy('reaper'));
     }
@@ -156,7 +164,17 @@ export class SurvivalDirector implements Director {
 
   resume(): void {
     if (this.stage === 'won') this.stage = 'endless';
+    else {
+      // Après une relique : petit soin (le soin entre manches n'existe qu'en mode Manches).
+      const heal = SURVIVAL_RELIC_HEAL * this.world.mods.waveHeal;
+      if (heal > 0) for (const h of this.world.heroes) if (h.alive) healPlayer(this.world, h, h.maxHp * heal);
+    }
     this.phase = 'active';
+  }
+
+  /** Les gemmes (et l'or) restés au sol sont aspirés vers les joueurs, comme à la fin d'une manche. */
+  private collectGems(): void {
+    for (const p of this.world.pickups) if (p.kind === 'gem' || p.kind === 'coin' || p.kind === 'bag') p.attracted = true;
   }
 
   hud(): DirectorHud {
