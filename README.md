@@ -25,10 +25,10 @@ Double-cliquez sur **`Creer-exe.bat`** (il lance `npm run exe` ; Node.js nécess
 
 - un **seul fichier portable** (environ 90 Mo), avec l’icône du jeu, **sans installation** ;
 - il se lance sans Node.js ni navigateur et peut être copié tel quel sur un autre PC (pratique pour jouer en ligne avec des amis) ;
-- `Jouer.bat` le démarre automatiquement dès qu’il existe ;
+- `Jouer.bat` lance alors automatiquement la version .exe ;
 - **F11** ou **Alt+Entrée** passent en plein écran ; un seul exemplaire du jeu peut être ouvert à la fois.
 
-À chaque lancement, l’exe se décompresse en quelques secondes dans le dossier temporaire de Windows. `release\win-unpacked\Nuit Eternelle.exe` est le même jeu déjà décompressé (démarrage immédiat, mais il a besoin de tout son dossier). L’exe n’est pas signé : si Windows affiche « Windows a protégé votre ordinateur », cliquez sur **Informations complémentaires › Exécuter quand même**.
+À chaque lancement, l’exe portable se décompresse en quelques secondes dans le dossier temporaire de Windows, sans rien afficher : patientez au lieu de double-cliquer à nouveau. `release\win-unpacked\Nuit Eternelle.exe` est le même jeu déjà décompressé (démarrage immédiat, mais il a besoin de tout son dossier) : c’est lui que `Jouer.bat` lance. Fermez le jeu avant de relancer `Creer-exe.bat`. L’exe n’est pas signé : si Windows affiche « Windows a protégé votre ordinateur », cliquez sur **Informations complémentaires › Exécuter quand même**.
 
 Après une modification du jeu, relancez `Creer-exe.bat` : l’exe ne se met pas à jour tout seul. Le workflow GitHub Actions **Exe Windows** (onglet Actions, lancement manuel ou tag `v*`) fabrique aussi l’exe et le propose en téléchargement.
 
@@ -240,7 +240,7 @@ Six onglets, accessibles depuis le menu principal ou la pause :
 | Jeu | Pseudo (multijoueur) ; chiffres de dégâts ; pause automatique quand la fenêtre perd le focus ; indicateurs hors écran ; pseudos au-dessus des joueurs ; vibrations de la manette |
 | Sauvegarde | Exporter et importer la sauvegarde ; effacer la progression (avec confirmation) |
 
-Sur un PC portable, si c’est la carte graphique intégrée qui est détectée, choisissez la carte NVIDIA pour Edge (ou pour l’exe) dans Paramètres Windows › Affichage › Graphiques.
+Sur un PC portable à deux cartes graphiques, la version .exe utilise d’elle-même la carte dédiée (NVIDIA). Avec la version Edge, si c’est la carte intégrée qui est détectée, choisissez la carte NVIDIA pour Edge dans Paramètres Windows › Affichage › Graphiques. Le préréglage n’est choisi automatiquement qu’au premier lancement : s’il est trop bas, sélectionnez Ultra dans Paramètres › Graphismes.
 
 ## Architecture
 

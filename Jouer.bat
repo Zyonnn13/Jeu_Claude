@@ -3,7 +3,11 @@ setlocal
 cd /d "%~dp0"
 title Nuit Eternelle
 
-rem Si l'exe a ete cree (Creer-exe.bat), on le lance directement.
+rem Si l'exe a ete cree (Creer-exe.bat), on lance sa version deja decompressee : demarrage immediat.
+if exist "release\win-unpacked\resources\app.asar" if exist "release\win-unpacked\Nuit Eternelle.exe" (
+  start "" "release\win-unpacked\Nuit Eternelle.exe"
+  exit /b 0
+)
 if exist "release\NuitEternelle.exe" (
   start "" "release\NuitEternelle.exe"
   exit /b 0

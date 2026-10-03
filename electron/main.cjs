@@ -15,6 +15,9 @@ const GAME_FILE = path.join(__dirname, '..', 'dist', 'index.html');
 
 // Même dossier de sauvegarde (localStorage) que l'on lance l'exe ou « npm run electron ».
 app.setPath('userData', path.join(app.getPath('appData'), 'Nuit Eternelle'));
+// PC portable à deux cartes graphiques : la carte dédiée (NVIDIA...) plutôt que la puce intégrée. Le réglage
+// Windows par application ne marche pas ici : le vrai programme tourne depuis un dossier temporaire.
+app.commandLine.appendSwitch('force_high_performance_gpu');
 
 /** @type {BrowserWindow | null} */
 let win = null;
