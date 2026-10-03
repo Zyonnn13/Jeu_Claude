@@ -14,6 +14,9 @@ import { settingsScreen } from '../ui/screens/SettingsScreen';
 import type { Screen } from '../ui/UIManager';
 import { renderOptions } from './renderOptions';
 
+/** Secondes sans nouvelles de l'hôte avant de prévenir le joueur. */
+const HOST_SILENCE = 4;
+
 export class ClientGameScene implements Scene {
   readonly world: ClientWorld;
   private readonly view: WorldRenderer;
@@ -22,6 +25,10 @@ export class ClientGameScene implements Scene {
   private overlay: HTMLElement | null = null;
   private ended = false;
   private inputTimer = 0;
+  /** Message affiché à la demande de l'hôte (pause, attente d'un choix). */
+  private hostOverlay: string | null = null;
+  /** Temps écoulé depuis le dernier message de l'hôte. */
+  private silence = 0;
 
   constructor(
     private readonly game: Game,
@@ -82,6 +89,10 @@ export class ClientGameScene implements Scene {
     }
     world.update(dt);
     if (world.hud) game.hud.update(world.hud);
+    // Hôte figé (fenêtre réduite, plantage…) : on l'indique au lieu de laisser croire à un bug.
+    const silent = this.silence > HOST_SILENCE;
+    this.silence += dt;
+    if (!silent && this.silence > HOST_SILENCE) this.refreshOverlay();
   }
 
   render(): void {
@@ -91,6 +102,9 @@ export class ClientGameScene implements Scene {
   }
 
   private onMessage(data: NetData): void {
+    const wasSilent = this.silence > HOST_SILENCE;
+    this.silence = 0;
+    if (wasSilent) this.refreshOverlay();
     if (data instanceof ArrayBuffer) {
       this.world.applySnapshot(data);
       return;
@@ -109,10 +123,12 @@ export class ClientGameScene implements Scene {
         }
         break;
       case 'wait':
-        this.setOverlay(m.text);
+        this.hostOverlay = m.text;
+        this.refreshOverlay();
         break;
       case 'paused':
-        this.setOverlay(m.paused ? 'Partie en pause (hôte)' : null);
+        this.hostOverlay = m.paused ? 'Partie en pause (hôte)' : null;
+        this.refreshOverlay();
         break;
       case 'ui':
         if (m.kind === 'banner') game.hud.showBanner(m.title, m.sub, m.style);
@@ -154,6 +170,11 @@ export class ClientGameScene implements Scene {
     if (this.choiceReq === req && game.ui.top?.el.classList.contains('choice-screen')) game.ui.replace(screen);
     else game.ui.push(screen);
     this.choiceReq = req;
+  }
+
+  private refreshOverlay(): void {
+    if (this.ended) return;
+    this.setOverlay(this.silence > HOST_SILENCE ? 'L’hôte ne répond plus… (sa fenêtre est peut-être réduite)' : this.hostOverlay);
   }
 
   private setOverlay(text: string | null): void {

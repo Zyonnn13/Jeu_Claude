@@ -328,6 +328,7 @@ export class GameScene implements Scene {
                   world.addGold(skipGold, hero);
                   game.ui.pop();
                   world.relicResolved();
+                  this.refreshWait();
                 },
               }
             : undefined,
@@ -336,6 +337,8 @@ export class GameScene implements Scene {
           if (offer.kind === 'evolution') game.audio.play('victory');
           game.ui.pop();
           if (kind === 'relic') world.relicResolved();
+          // Les joueurs en ligne n'attendent plus le choix de l'hôte.
+          this.refreshWait();
         },
       }),
     );

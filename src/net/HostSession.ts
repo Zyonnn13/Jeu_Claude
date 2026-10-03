@@ -16,6 +16,8 @@ interface Client {
 }
 
 const MAX_FX = 160;
+/** Au-delà, on saute des images d'état plutôt que d'accumuler du retard chez un joueur à la connexion lente. */
+const MAX_BACKLOG = 256 * 1024;
 
 export class HostSession {
   private clients: Client[];
@@ -125,6 +127,10 @@ export class HostSession {
     const shared = this.fx.length > MAX_FX ? this.fx.slice(-MAX_FX) : this.fx;
     for (const c of this.clients) {
       if (!c.connected) continue;
+      if (c.remote.conn.backlog > MAX_BACKLOG) {
+        c.fx = c.fx.slice(-MAX_FX);
+        continue;
+      }
       const hero = w.heroes[c.heroIndex];
       const buf = buildSnapshot(
         {

@@ -70,6 +70,7 @@ export class LobbyHost {
     const m = decodeMessage<ClientMessage>(data);
     if (!m) return;
     if (m.t === 'hello') {
+      if (this.remotes.has(conn.id)) return;
       if (this.started) return this.send(conn, { t: 'kick', reason: 'La partie a déjà commencé.' });
       if (m.version !== PROTOCOL_VERSION) return this.send(conn, { t: 'kick', reason: 'Version du jeu différente de celle de l’hôte.' });
       if (this.players.length >= MAX_PLAYERS) return this.send(conn, { t: 'kick', reason: 'La partie est complète (4 joueurs).' });

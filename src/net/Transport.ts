@@ -1,11 +1,13 @@
 // Couche de transport réseau : une connexion bidirectionnelle par joueur.
 // Implémentation en ligne : WebRTC pair-à-pair (PeerJS), avec un code de salon à 5 caractères.
-import Peer, { type DataConnection } from 'peerjs';
+import Peer, { type DataConnection, type PeerOptions } from 'peerjs';
 
 export type NetData = string | ArrayBuffer;
 
 export interface Connection {
   readonly id: string;
+  /** Octets en attente d'envoi : grandit quand la connexion du joueur est trop lente. */
+  readonly backlog: number;
   send(data: NetData): void;
   onMessage(cb: (data: NetData) => void): void;
   onClose(cb: () => void): void;
@@ -27,6 +29,18 @@ function randomCode(): string {
   let s = '';
   for (let i = 0; i < 5; i++) s += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
   return s;
+}
+
+/**
+ * Serveur de mise en relation : celui de PeerJS par défaut, ou un serveur personnel
+ * indiqué dans l'adresse avec ?peer=hote:port (tests automatisés, réseau local).
+ */
+function peerOptions(): PeerOptions {
+  const custom = new URLSearchParams(location.search).get('peer');
+  if (!custom) return { debug: 0 };
+  const [host, port] = custom.split(':');
+  const portNum = Number(port) || 9000;
+  return { debug: 0, host, port: portNum, path: '/', secure: portNum === 443 };
 }
 
 export function normalizeCode(code: string): string {
@@ -54,6 +68,12 @@ class PeerConnection implements Connection {
 
   get id(): string {
     return this.dc.peer;
+  }
+
+  get backlog(): number {
+    // Tampon du navigateur + messages mis en file par PeerJS quand ce tampon déborde.
+    const queued = (this.dc as DataConnection & { bufferSize?: number }).bufferSize ?? 0;
+    return (this.dc.dataChannel?.bufferedAmount ?? 0) + queued * 64 * 1024;
   }
 
   send(data: NetData): void {
@@ -97,11 +117,24 @@ function describeError(err: { type?: string; message?: string }): string {
   }
 }
 
+/**
+ * Ferme les connexions quand la fenêtre du jeu se ferme : sans cela, les autres joueurs
+ * ne s'en rendent compte qu'au bout de longues secondes. Renvoie la fonction de fermeture.
+ */
+function closeOnExit(peer: Peer): () => void {
+  const close = () => {
+    window.removeEventListener('pagehide', close);
+    peer.destroy();
+  };
+  window.addEventListener('pagehide', close);
+  return close;
+}
+
 /** Crée une partie en ligne et attend les joueurs. */
 export function hostOnline(): Promise<HostTransport> {
   return new Promise((resolve, reject) => {
     const code = randomCode();
-    const peer = new Peer(PREFIX + code, { debug: 0 });
+    const peer = new Peer(PREFIX + code, peerOptions());
     let connectionCb: ((conn: Connection) => void) | null = null;
     const timeout = window.setTimeout(() => {
       peer.destroy();
@@ -112,11 +145,12 @@ export function hostOnline(): Promise<HostTransport> {
       resolve({
         code,
         onConnection: (cb) => (connectionCb = cb),
-        close: () => peer.destroy(),
+        close: closeOnExit(peer),
       });
     });
     peer.on('connection', (dc) => {
-      dc.on('open', () => connectionCb?.(new PeerConnection(dc)));
+      // PeerJS émet parfois « open » deux fois pour la même connexion : le joueur apparaissait en double.
+      dc.once('open', () => connectionCb?.(new PeerConnection(dc)));
     });
     peer.on('error', (err) => {
       window.clearTimeout(timeout);
@@ -133,16 +167,16 @@ export function joinOnline(rawCode: string): Promise<{ conn: Connection; close: 
       reject(new Error('Le code doit contenir 5 caractères.'));
       return;
     }
-    const peer = new Peer({ debug: 0 });
+    const peer = new Peer(peerOptions());
     const timeout = window.setTimeout(() => {
       peer.destroy();
       reject(new Error('La partie ne répond pas. Vérifiez le code.'));
     }, 15000);
     peer.on('open', () => {
       const dc = peer.connect(PREFIX + code, { reliable: true, serialization: 'raw' });
-      dc.on('open', () => {
+      dc.once('open', () => {
         window.clearTimeout(timeout);
-        resolve({ conn: new PeerConnection(dc), close: () => peer.destroy() });
+        resolve({ conn: new PeerConnection(dc), close: closeOnExit(peer) });
       });
     });
     peer.on('error', (err) => {
