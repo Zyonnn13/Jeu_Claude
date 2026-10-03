@@ -60,6 +60,8 @@ export class Game {
   private fpsEl: HTMLElement | null = null;
   private fpsFrames = 0;
   private fpsTime = 0;
+  /** Horloge de secours quand la fenêtre est cachée (voir updateBackgroundLoop). */
+  private backgroundClock: Worker | null = null;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -80,6 +82,7 @@ export class Game {
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('blur', () => this.audio.setMuted(this.save.data.settings.muteUnfocused));
     window.addEventListener('focus', () => this.audio.setMuted(false));
+    document.addEventListener('visibilitychange', () => this.updateBackgroundLoop());
     // Interface adaptée à la manette (indications de boutons, curseur masqué).
     this.input.onDeviceChange = (device) => document.body.classList.toggle('gamepad', device === 'gamepad');
 
@@ -138,6 +141,30 @@ export class Game {
     this.scene?.exit();
     this.scene = scene;
     scene.enter();
+    this.updateBackgroundLoop();
+  }
+
+  /**
+   * Fenêtre réduite ou cachée par une autre : le navigateur n'appelle plus requestAnimationFrame.
+   * L'hôte d'une partie en ligne continue alors la simulation au rythme d'un Worker (dont les minuteries
+   * ne sont pas ralenties), sans dessiner, pour ne pas figer la partie des autres joueurs.
+   */
+  private updateBackgroundLoop(): void {
+    const needed = document.hidden && this.scene?.runsInBackground === true;
+    if (needed && !this.backgroundClock) {
+      try {
+        const code = 'setInterval(() => postMessage(0), 1000 / 60);';
+        const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+        this.backgroundClock = new Worker(url);
+        URL.revokeObjectURL(url);
+        this.backgroundClock.onmessage = () => this.tick(performance.now(), false);
+      } catch {
+        // Workers indisponibles : la partie se figera fenêtre cachée.
+      }
+    } else if (!needed && this.backgroundClock) {
+      this.backgroundClock.terminate();
+      this.backgroundClock = null;
+    }
   }
 
   goToMenu(): void {
@@ -173,7 +200,12 @@ export class Game {
     const limit = this.save.data.settings.graphics.fpsLimit;
     if (limit > 0 && time - this.lastFrame < 1000 / limit - 1) return;
     this.lastFrame = time;
+    this.tick(time, true);
+  };
+
+  private tick(time: number, draw: boolean): void {
     let dt = (time - this.lastTime) / 1000;
+    if (dt <= 0) return;
     this.lastTime = time;
     // Après une mise en veille de l'onglet, on ne rattrape pas des secondes de simulation.
     dt = Math.min(dt, 0.1);
@@ -182,8 +214,9 @@ export class Game {
       // Sous-pas pour garder une simulation stable même à faible framerate.
       const steps = Math.max(1, Math.ceil(dt * 60 - 0.05));
       for (let i = 0; i < steps; i++) this.scene.update(dt / steps);
-      this.scene.render();
+      if (draw) this.scene.render();
     }
+    if (!draw) return;
     if (this.fpsEl) {
       this.fpsFrames++;
       this.fpsTime += dt;
@@ -195,5 +228,5 @@ export class Game {
         this.fpsTime = 0;
       }
     }
-  };
+  }
 }

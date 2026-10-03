@@ -10,6 +10,8 @@ import type { World } from '../game/World';
 export const PROTOCOL_VERSION = 2;
 /** Images d'état envoyées par seconde. */
 export const SNAPSHOT_RATE = 15;
+/** Secondes sans aucun message d'un joueur avant de le considérer comme parti (plantage, coupure). */
+export const NET_TIMEOUT = 30;
 
 // Tables d'indices partagées (identiques chez l'hôte et les clients).
 export const SPRITE_NAMES = Object.keys(manifest).sort();

@@ -5,7 +5,7 @@ import type { SfxName } from '../engine/Audio';
 import type { Hero } from '../game/Hero';
 import type { SoundPlayer, World } from '../game/World';
 import type { RemotePlayer } from './Lobby';
-import { buildSnapshot, decodeMessage, encodeEntities, encodeMessage, SNAPSHOT_RATE, type ClientMessage, type FxEvent, type HostMessage } from './Protocol';
+import { buildSnapshot, decodeMessage, encodeEntities, encodeMessage, NET_TIMEOUT, SNAPSHOT_RATE, type ClientMessage, type FxEvent, type HostMessage } from './Protocol';
 
 interface Client {
   remote: RemotePlayer;
@@ -13,6 +13,8 @@ interface Client {
   ack: number;
   fx: FxEvent[];
   connected: boolean;
+  /** Temps écoulé depuis son dernier message. */
+  silence: number;
 }
 
 const MAX_FX = 160;
@@ -32,7 +34,7 @@ export class HostSession {
     private readonly world: World,
     remotes: { remote: RemotePlayer; heroIndex: number }[],
   ) {
-    this.clients = remotes.map((r) => ({ ...r, ack: 0, fx: [], connected: true }));
+    this.clients = remotes.map((r) => ({ ...r, ack: 0, fx: [], connected: true, silence: 0 }));
     for (const c of this.clients) {
       c.remote.conn.onMessage((data) => typeof data === 'string' && this.onMessage(c, data));
       c.remote.conn.onClose(() => this.disconnect(c));
@@ -67,6 +69,7 @@ export class HostSession {
   }
 
   private onMessage(c: Client, data: string): void {
+    c.silence = 0;
     const m = decodeMessage<ClientMessage>(data);
     if (!m) return;
     const hero = this.world.heroes[c.heroIndex];
@@ -119,6 +122,16 @@ export class HostSession {
 
   /** Envoie l'état du monde à intervalle régulier. */
   update(dt: number): void {
+    // Un joueur muet depuis trop longtemps a planté ou perdu sa connexion : sans cela, la partie
+    // attendrait indéfiniment ses choix de bonus.
+    for (const c of this.clients) {
+      if (!c.connected) continue;
+      c.silence += dt;
+      if (c.silence > NET_TIMEOUT) {
+        this.disconnect(c);
+        c.remote.conn.close();
+      }
+    }
     this.timer += dt;
     if (this.timer < 1 / SNAPSHOT_RATE) return;
     this.timer = 0;

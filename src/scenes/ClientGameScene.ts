@@ -5,7 +5,7 @@ import { WorldRenderer } from '../game/render/WorldRenderer';
 import type { Offer, OfferView } from '../game/systems/Upgrades';
 import { ClientWorld } from '../net/ClientWorld';
 import type { LobbyClient } from '../net/Lobby';
-import { decodeMessage, encodeMessage, type ClientMessage, type HostMessage, type StartInfo } from '../net/Protocol';
+import { decodeMessage, encodeMessage, NET_TIMEOUT, type ClientMessage, type HostMessage, type StartInfo } from '../net/Protocol';
 import type { NetData } from '../net/Transport';
 import { button, h } from '../ui/dom';
 import { choiceScreen } from '../ui/screens/ChoiceScreen';
@@ -79,7 +79,9 @@ export class ClientGameScene implements Scene {
     world.viewW = game.renderer.viewW;
     world.viewH = game.renderer.viewH;
     const choosing = game.ui.top?.el.classList.contains('choice-screen') ?? false;
-    const move = this.ended || choosing ? { x: 0, y: 0 } : game.input.moveVector();
+    // Partie figée chez l'hôte (pause, choix en cours) : on ne bouge pas, sinon le héros reviendrait en arrière.
+    const frozen = this.ended || choosing || this.hostOverlay !== null || this.silence > HOST_SILENCE;
+    const move = frozen ? { x: 0, y: 0 } : game.input.moveVector();
     const input = world.pushInput(move, dt);
     // Commandes envoyées à ~60 messages/s au maximum.
     this.inputTimer += dt;
@@ -89,16 +91,22 @@ export class ClientGameScene implements Scene {
     }
     world.update(dt);
     if (world.hud) game.hud.update(world.hud);
-    // Hôte figé (fenêtre réduite, plantage…) : on l'indique au lieu de laisser croire à un bug.
+    // Hôte figé : on l'indique au lieu de laisser croire à un bug, puis on abandonne s'il a planté.
     const silent = this.silence > HOST_SILENCE;
     this.silence += dt;
     if (!silent && this.silence > HOST_SILENCE) this.refreshOverlay();
+    if (this.silence > NET_TIMEOUT) this.disconnected('L’hôte ne répond plus : la partie est interrompue.');
   }
 
   render(): void {
     this.world.viewW = this.game.renderer.viewW;
     this.world.viewH = this.game.renderer.viewH;
     this.view.render(this.world, renderOptions(this.game.save.data.settings));
+  }
+
+  /** Nos commandes servent aussi de signe de vie pour l'hôte : on continue d'en envoyer fenêtre cachée. */
+  get runsInBackground(): boolean {
+    return !this.ended;
   }
 
   private onMessage(data: NetData): void {
@@ -174,7 +182,7 @@ export class ClientGameScene implements Scene {
 
   private refreshOverlay(): void {
     if (this.ended) return;
-    this.setOverlay(this.silence > HOST_SILENCE ? 'L’hôte ne répond plus… (sa fenêtre est peut-être réduite)' : this.hostOverlay);
+    this.setOverlay(this.silence > HOST_SILENCE ? 'L’hôte ne répond plus…' : this.hostOverlay);
   }
 
   private setOverlay(text: string | null): void {

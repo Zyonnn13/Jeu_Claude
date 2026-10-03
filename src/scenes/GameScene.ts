@@ -90,6 +90,11 @@ export class GameScene implements Scene {
     return !!this.host;
   }
 
+  /** Les autres joueurs attendent nos images d'état : la partie continue fenêtre cachée. */
+  get runsInBackground(): boolean {
+    return this.online && !this.ended;
+  }
+
   enter(): void {
     const { game, world } = this;
     game.ui.clear();

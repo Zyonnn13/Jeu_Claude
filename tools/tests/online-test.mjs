@@ -209,6 +209,12 @@ async function scenarioDuo() {
   await host.keyboard.press('Escape');
   const pausedOk = await until(guest, () => document.querySelector('.net-wait')?.textContent.includes('pause') ?? false, undefined, 5000);
   check('La pause de l’hôte est affichée chez l’invité', pausedOk);
+  const predBefore = await guest.evaluate(() => window.game.scene.world.predX);
+  await guest.keyboard.down('KeyD');
+  await sleep(800);
+  await guest.keyboard.up('KeyD');
+  const predAfter = await guest.evaluate(() => window.game.scene.world.predX);
+  check('Le héros de l’invité reste immobile pendant la pause', Math.abs(predAfter - predBefore) < 1, `Δx = ${(predAfter - predBefore).toFixed(1)}`);
   await clickText(host, 'Reprendre');
   const unpaused = await until(guest, () => !document.querySelector('.net-wait'), undefined, 5000);
   check('La reprise est transmise', unpaused);
@@ -347,7 +353,32 @@ const interrupted = () => document.querySelector('.screen-header h2')?.textConte
 async function scenarioHoteParti() {
   console.log('\n— Scénario 3 : hôte figé, puis départ de l’hôte —');
   let { host, guest } = await startDuo();
-  // Boucle de l'hôte arrêtée (comme une fenêtre réduite) : l'invité est prévenu, puis tout reprend.
+  // Fenêtre de l'hôte cachée (réduite ou couverte) : plus de requestAnimationFrame, mais la partie continue.
+  await host.evaluate(() => {
+    window.__raf = window.requestAnimationFrame;
+    window.requestAnimationFrame = () => 0;
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  const t1 = await guest.evaluate(() => window.game.scene.world.time);
+  await sleep(4000);
+  const t2 = await guest.evaluate(() => window.game.scene.world.time);
+  const warned = await guest.evaluate(() => !!document.querySelector('.net-wait'));
+  check('La partie continue quand la fenêtre de l’hôte est cachée', t2 - t1 > 2.5 && !warned, `${(t2 - t1).toFixed(1)} s de jeu en 4 s`);
+  await host.evaluate(() => {
+    delete document.hidden;
+    delete document.visibilityState;
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.requestAnimationFrame = window.__raf;
+    window.requestAnimationFrame(window.game.frame);
+  });
+  const t3 = await guest.evaluate(() => window.game.scene.world.time);
+  await sleep(1500);
+  const t4 = await guest.evaluate(() => window.game.scene.world.time);
+  check('La boucle normale reprend quand la fenêtre réapparaît', t4 - t3 > 0.8 && (await host.evaluate(() => window.game.backgroundClock === null)));
+
+  // Boucle de l'hôte arrêtée (plantage partiel, onglet gelé) : l'invité est prévenu, puis tout reprend.
   await host.evaluate(() => {
     window.__raf = window.requestAnimationFrame;
     window.requestAnimationFrame = () => 0;
@@ -372,11 +403,28 @@ async function scenarioHoteParti() {
   ({ host, guest } = await startDuo());
   const cdp = await host.context().newCDPSession(host);
   t0 = Date.now();
-  await cdp.send('Page.crash').catch(() => undefined);
+  // La page meurt avant de répondre : on n'attend pas la réponse.
+  cdp.send('Page.crash').catch(() => undefined);
   const crashed = await until(guest, interrupted, undefined, 90000);
   check('L’invité est prévenu si l’hôte plante', crashed, crashed ? `${((Date.now() - t0) / 1000).toFixed(1)} s` : `rien après 90 s : ${await uiState(guest)}`);
   await host.context().close().catch(() => undefined);
   await guest.context().close();
+
+  // Plantage d'un invité : l'hôte le retire et la partie ne l'attend pas pour les choix de bonus.
+  ({ host, guest } = await startDuo());
+  const cdp2 = await guest.context().newCDPSession(guest);
+  t0 = Date.now();
+  cdp2.send('Page.crash').catch(() => undefined);
+  const dropped = await until(host, () => window.game.scene.world.heroes[1].left === true, undefined, 90000);
+  check('L’hôte retire un invité qui a planté', dropped, dropped ? `${((Date.now() - t0) / 1000).toFixed(1)} s` : await uiState(host));
+  await host.evaluate(() => {
+    const w = window.game.scene.world;
+    w.addXp(w.run.xpNext - w.run.xp + 0.01, w.heroes[0]);
+  });
+  const ownChoice = await until(host, () => !!document.querySelector('.choice-screen .choice-card') && !document.querySelector('.net-wait'), undefined, 5000);
+  check('Montée de niveau ensuite : seul l’hôte choisit, sans attente', ownChoice, ownChoice ? '' : await uiState(host));
+  await host.context().close();
+  await guest.context().close().catch(() => undefined);
 }
 
 const only = process.argv[2];
