@@ -55,6 +55,8 @@ export class SurvivalDirector implements Director {
   private nextElite = 75;
   private eventsDone = new Set<number>();
   private relicsDone = new Set<number>();
+  /** Reliques accordées depuis la dernière reprise : chacune soigne (deux peuvent tomber dans la même image). */
+  private relicHeals = 0;
 
   constructor(private readonly world: World) {
     queueMicrotask(() => world.events.emit('wave:start', { wave: 1, boss: false }));
@@ -84,6 +86,7 @@ export class SurvivalDirector implements Director {
         w.audio.play('wave');
         w.events.emit('survival:milestone', { text: 'Relique !' });
         this.collectGems();
+        this.relicHeals++;
         w.grantRelicChoice();
         return;
       }
@@ -153,6 +156,9 @@ export class SurvivalDirector implements Director {
     if (this.stage === 'subBoss') {
       this.stage = 'normal';
       this.phase = 'waiting';
+      // Comme pour les autres reliques, le butin du sous-boss et les gemmes au sol sont aspirés.
+      w.defer(() => this.collectGems());
+      this.relicHeals++;
       w.grantRelicChoice();
     } else if (this.stage === 'megaBoss' && enemy.def.id === 'reaper') {
       this.stage = 'won';
@@ -166,7 +172,8 @@ export class SurvivalDirector implements Director {
     if (this.stage === 'won') this.stage = 'endless';
     else {
       // Après une relique : petit soin (le soin entre manches n'existe qu'en mode Manches).
-      const heal = SURVIVAL_RELIC_HEAL * this.world.mods.waveHeal;
+      const heal = SURVIVAL_RELIC_HEAL * this.world.mods.waveHeal * this.relicHeals;
+      this.relicHeals = 0;
       if (heal > 0) for (const h of this.world.heroes) if (h.alive) healPlayer(this.world, h, h.maxHp * heal);
     }
     this.phase = 'active';

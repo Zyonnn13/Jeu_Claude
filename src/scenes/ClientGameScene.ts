@@ -85,7 +85,7 @@ export class ClientGameScene implements Scene {
     const input = world.pushInput(move, dt);
     // Commandes envoyées à ~60 messages/s au maximum.
     this.inputTimer += dt;
-    if (this.inputTimer >= 1 / 60) {
+    if (this.inputTimer >= 1 / 60 && !this.ended) {
       this.inputTimer = 0;
       this.send({ t: 'i', ...input });
     }
@@ -110,6 +110,7 @@ export class ClientGameScene implements Scene {
   }
 
   private onMessage(data: NetData): void {
+    if (this.ended) return;
     const wasSilent = this.silence > HOST_SILENCE;
     this.silence = 0;
     if (wasSilent) this.refreshOverlay();
@@ -247,6 +248,8 @@ export class ClientGameScene implements Scene {
   private disconnected(reason: string): void {
     if (this.ended) return;
     this.ended = true;
+    // Connexion fermée tout de suite : l'hôte (s'il est encore là) nous retire sans attendre.
+    this.lobby.dispose();
     this.setOverlay(null);
     this.game.hud.hide();
     this.game.ui.clear();

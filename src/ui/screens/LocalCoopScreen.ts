@@ -22,9 +22,10 @@ export function localCoopScreen(game: Game): Screen {
 
   const label = (c: Controller) => (c.type === 'keyboard' ? 'Clavier' : c.type === 'pad' ? `Manette ${c.index + 1}` : 'Clavier/manette');
 
-  const render = () => {
+  /** `focus` : bouton à sélectionner ensuite (par défaut, le même qu'avant la reconstruction). */
+  const render = (focus?: string) => {
     // Les boutons sont reconstruits : le focus (clavier / manette) reste ensuite sur le même bouton.
-    const focusKey = document.activeElement instanceof HTMLElement ? document.activeElement.dataset.key : undefined;
+    const focusKey = focus ?? (document.activeElement instanceof HTMLElement ? document.activeElement.dataset.key : undefined);
     grid.replaceChildren(
       ...[0, 1, 2, 3].map((i) => {
         const s = slots[i];
@@ -45,7 +46,8 @@ export function localCoopScreen(game: Game): Screen {
         }, 'btn-small');
         const remove = button('Retirer', () => {
           slots.splice(i, 1);
-          render();
+          // Pas sur le « Retirer » du joueur suivant : un second appui l'exclurait aussi.
+          render(slots.length ? `hero${Math.min(i, slots.length - 1)}` : 'join');
         }, 'btn-small');
         cycle.dataset.key = `hero${i}`;
         remove.dataset.key = `remove${i}`;
@@ -81,9 +83,12 @@ export function localCoopScreen(game: Game): Screen {
       );
     }, 'btn-primary');
     if (!slots.length) start.classList.add('is-disabled');
+    const back = button('Retour', () => game.ui.pop());
     joinKb.dataset.key = 'join';
     modeBtn.dataset.key = 'mode';
-    actions.replaceChildren(joinKb, modeBtn, start, button('Retour', () => game.ui.pop()));
+    start.dataset.key = 'start';
+    back.dataset.key = 'back';
+    actions.replaceChildren(joinKb, modeBtn, start, back);
     if (focusKey) el.querySelector<HTMLElement>(`[data-key="${focusKey}"]`)?.focus({ preventScroll: true });
   };
 

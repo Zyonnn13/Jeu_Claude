@@ -419,6 +419,8 @@ export class GameScene implements Scene {
     if (localChoosing) choosing.add(this.world.heroes[0]);
     const text = (heroes: Hero[]) => (heroes.length ? `En attente du choix de : ${heroes.map((h) => h.name).join(', ')}…` : null);
     this.setWait(localChoosing ? null : text([...choosing]));
+    // Pendant la pause, les invités gardent le message de pause (renvoyé à la reprise).
+    if (this.hostPaused) return;
     for (const h of this.world.heroes) {
       if (!this.host.isRemote(h.index)) continue;
       const msg = choosing.has(h) ? null : text([...choosing]);

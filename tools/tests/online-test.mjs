@@ -334,6 +334,29 @@ async function scenarioGroupe() {
   // Capture d'écran d'un invité en partie, seulement si un dossier est indiqué (SCREENSHOTS=dossier).
   if (process.env.SCREENSHOTS) await g1.screenshot({ path: path.join(process.env.SCREENSHOTS, 'online-invite.png') }).catch(() => undefined);
 
+  // Pause de l'hôte pendant que Chloé choisit encore : Bob doit rester en pause quand elle valide.
+  await host.evaluate(() => {
+    const w = window.game.scene.world;
+    w.addXp(w.run.xpNext - w.run.xp + 0.01, w.heroes[0]);
+  });
+  const doneH = new Set();
+  const doneB = new Set();
+  for (let i = 0; i < 60 && (doneH.size < 1 || doneB.size < 1); i++) {
+    await pickTop(host, doneH);
+    await pickTop(g1, doneB);
+    await sleep(200);
+  }
+  const bobWaits = await until(g1, () => document.querySelector('.net-wait')?.textContent.includes('Chloé') ?? false, undefined, 5000);
+  await host.keyboard.press('Escape');
+  const bobPaused = await until(g1, () => document.querySelector('.net-wait')?.textContent.includes('pause') ?? false, undefined, 5000);
+  await pickTop(g2, new Set());
+  await sleep(1500);
+  const stillPaused = await g1.evaluate(() => document.querySelector('.net-wait')?.textContent ?? '');
+  check('Pause de l’hôte conservée chez un invité quand un autre finit son choix', bobWaits && bobPaused && stillPaused.includes('pause'), `« ${stillPaused} »`);
+  await clickText(host, 'Reprendre');
+  const resumedAll = await until(g1, () => !document.querySelector('.net-wait'), undefined, 5000);
+  check('Reprise après la pause', resumedAll);
+
   // Bob tombe à terre, Alice vient le relever.
   await host.evaluate(() => {
     const w = window.game.scene.world;

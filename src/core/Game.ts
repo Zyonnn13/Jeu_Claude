@@ -153,11 +153,16 @@ export class Game {
     const needed = document.hidden && this.scene?.runsInBackground === true;
     if (needed && !this.backgroundClock) {
       try {
-        const code = 'setInterval(() => postMessage(0), 1000 / 60);';
+        // Le Worker attend la fin de chaque pas avant de programmer le suivant : jamais de retard accumulé.
+        const code = 'onmessage = () => setTimeout(() => postMessage(0), 1000 / 60); postMessage(0);';
         const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
-        this.backgroundClock = new Worker(url);
+        const clock = new Worker(url);
         URL.revokeObjectURL(url);
-        this.backgroundClock.onmessage = () => this.tick(performance.now(), false);
+        clock.onmessage = () => {
+          this.tick(performance.now(), false);
+          clock.postMessage(0);
+        };
+        this.backgroundClock = clock;
       } catch {
         // Workers indisponibles : la partie se figera fenêtre cachée.
       }
