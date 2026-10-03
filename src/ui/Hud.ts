@@ -159,6 +159,9 @@ export class Hud {
   showBanner(title: string, subtitle = '', kind: 'normal' | 'boss' | 'success' = 'normal', duration = 2.2): void {
     this.banner.replaceChildren(h('div', { class: 'banner-title', text: title }));
     if (subtitle) this.banner.append(h('div', { class: 'banner-sub', text: subtitle }));
+    // Relance l'animation même si l'annonce précédente est encore affichée (sinon la nouvelle reste invisible).
+    this.banner.className = 'banner';
+    void this.banner.offsetWidth;
     this.banner.className = `banner show ${kind}`;
     if (this.bannerTimer !== null) window.clearTimeout(this.bannerTimer);
     this.bannerTimer = window.setTimeout(() => {

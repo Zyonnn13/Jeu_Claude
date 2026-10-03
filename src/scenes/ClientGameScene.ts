@@ -5,7 +5,7 @@ import { WorldRenderer } from '../game/render/WorldRenderer';
 import type { Offer, OfferView } from '../game/systems/Upgrades';
 import { ClientWorld } from '../net/ClientWorld';
 import type { LobbyClient } from '../net/Lobby';
-import { decodeMessage, encodeMessage, type ClientMessage, type HostMessage, type StartInfo } from '../net/Protocol';
+import { decodeMessage, encodeMessage, NET_TIMEOUT, type ClientMessage, type HostMessage, type StartInfo } from '../net/Protocol';
 import type { NetData } from '../net/Transport';
 import { button, h } from '../ui/dom';
 import { choiceScreen } from '../ui/screens/ChoiceScreen';
@@ -13,6 +13,9 @@ import { messageScreen, onlineResultScreen } from '../ui/screens/ResultScreen';
 import { settingsScreen } from '../ui/screens/SettingsScreen';
 import type { Screen } from '../ui/UIManager';
 import { renderOptions } from './renderOptions';
+
+/** Secondes sans nouvelles de l'hôte avant de prévenir le joueur. */
+const HOST_SILENCE = 4;
 
 export class ClientGameScene implements Scene {
   readonly world: ClientWorld;
@@ -22,6 +25,10 @@ export class ClientGameScene implements Scene {
   private overlay: HTMLElement | null = null;
   private ended = false;
   private inputTimer = 0;
+  /** Message affiché à la demande de l'hôte (pause, attente d'un choix). */
+  private hostOverlay: string | null = null;
+  /** Temps écoulé depuis le dernier message de l'hôte. */
+  private silence = 0;
 
   constructor(
     private readonly game: Game,
@@ -72,16 +79,23 @@ export class ClientGameScene implements Scene {
     world.viewW = game.renderer.viewW;
     world.viewH = game.renderer.viewH;
     const choosing = game.ui.top?.el.classList.contains('choice-screen') ?? false;
-    const move = this.ended || choosing ? { x: 0, y: 0 } : game.input.moveVector();
+    // Partie figée chez l'hôte (pause, choix en cours) : on ne bouge pas, sinon le héros reviendrait en arrière.
+    const frozen = this.ended || choosing || this.hostOverlay !== null || this.silence > HOST_SILENCE;
+    const move = frozen ? { x: 0, y: 0 } : game.input.moveVector();
     const input = world.pushInput(move, dt);
     // Commandes envoyées à ~60 messages/s au maximum.
     this.inputTimer += dt;
-    if (this.inputTimer >= 1 / 60) {
+    if (this.inputTimer >= 1 / 60 && !this.ended) {
       this.inputTimer = 0;
       this.send({ t: 'i', ...input });
     }
     world.update(dt);
     if (world.hud) game.hud.update(world.hud);
+    // Hôte figé : on l'indique au lieu de laisser croire à un bug, puis on abandonne s'il a planté.
+    const silent = this.silence > HOST_SILENCE;
+    this.silence += dt;
+    if (!silent && this.silence > HOST_SILENCE) this.refreshOverlay();
+    if (this.silence > NET_TIMEOUT) this.disconnected('L’hôte ne répond plus : la partie est interrompue.');
   }
 
   render(): void {
@@ -90,7 +104,16 @@ export class ClientGameScene implements Scene {
     this.view.render(this.world, renderOptions(this.game.save.data.settings));
   }
 
+  /** Nos commandes servent aussi de signe de vie pour l'hôte : on continue d'en envoyer fenêtre cachée. */
+  get runsInBackground(): boolean {
+    return !this.ended;
+  }
+
   private onMessage(data: NetData): void {
+    if (this.ended) return;
+    const wasSilent = this.silence > HOST_SILENCE;
+    this.silence = 0;
+    if (wasSilent) this.refreshOverlay();
     if (data instanceof ArrayBuffer) {
       this.world.applySnapshot(data);
       return;
@@ -109,10 +132,12 @@ export class ClientGameScene implements Scene {
         }
         break;
       case 'wait':
-        this.setOverlay(m.text);
+        this.hostOverlay = m.text;
+        this.refreshOverlay();
         break;
       case 'paused':
-        this.setOverlay(m.paused ? 'Partie en pause (hôte)' : null);
+        this.hostOverlay = m.paused ? 'Partie en pause (hôte)' : null;
+        this.refreshOverlay();
         break;
       case 'ui':
         if (m.kind === 'banner') game.hud.showBanner(m.title, m.sub, m.style);
@@ -154,6 +179,11 @@ export class ClientGameScene implements Scene {
     if (this.choiceReq === req && game.ui.top?.el.classList.contains('choice-screen')) game.ui.replace(screen);
     else game.ui.push(screen);
     this.choiceReq = req;
+  }
+
+  private refreshOverlay(): void {
+    if (this.ended) return;
+    this.setOverlay(this.silence > HOST_SILENCE ? 'L’hôte ne répond plus…' : this.hostOverlay);
   }
 
   private setOverlay(text: string | null): void {
@@ -218,6 +248,8 @@ export class ClientGameScene implements Scene {
   private disconnected(reason: string): void {
     if (this.ended) return;
     this.ended = true;
+    // Connexion fermée tout de suite : l'hôte (s'il est encore là) nous retire sans attendre.
+    this.lobby.dispose();
     this.setOverlay(null);
     this.game.hud.hide();
     this.game.ui.clear();

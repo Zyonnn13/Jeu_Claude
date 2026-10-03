@@ -1,6 +1,7 @@
 // Écran générique de choix de bonus (montée de niveau, coffre, relique de fin de manche).
 import { RARITY_INFO } from '../../data/balance';
 import type { Assets } from '../../engine/Assets';
+import type { Controller } from '../../engine/Input';
 import type { Offer } from '../../game/systems/Upgrades';
 import { button, h, levelPips, spriteEl } from '../dom';
 import type { Screen } from '../UIManager';
@@ -12,6 +13,8 @@ export interface ChoiceOptions {
   subtitle?: string;
   /** Couleur du joueur concerné (coopération). */
   accent?: string;
+  /** Coop locale : clavier ou manette du joueur concerné (seul à pouvoir choisir). */
+  owner?: Controller;
   offers: Offer[];
   onPick(offer: Offer): void;
   /** Relances restantes, et fonction qui produit de nouvelles offres. */
@@ -92,18 +95,23 @@ export function choiceScreen(opts: ChoiceOptions): Screen {
   renderCards();
   renderActions();
 
+  // Indications de touches : celles du périphérique du joueur concerné en coop locale, sinon du dernier utilisé.
+  const device = opts.owner?.type === 'pad' ? 'pad' : opts.owner?.type === 'keyboard' ? 'kb' : null;
+  const hint = (kind: 'kb' | 'pad', text: string) => (device && device !== kind ? null : h('div', { class: device ? 'choice-hint' : `choice-hint ${kind}-only`, text }));
+
   const el = h(
     'div',
     { class: `choice-screen variant-${opts.variant}`, style: opts.accent ? { '--accent': opts.accent } : {} },
     h('div', { class: 'choice-header' }, h('h2', { text: opts.title }), opts.subtitle ? h('div', { class: 'choice-subtitle', text: opts.subtitle }) : null),
     cards,
     actions,
-    h('div', { class: 'choice-hint kb-only', text: 'Touches 1 à 4 pour choisir directement · R pour relancer' }),
-    h('div', { class: 'choice-hint pad-only', text: 'Ⓐ choisir · Ⓨ relancer' }),
+    hint('kb', 'Touches 1 à 4 pour choisir directement · R pour relancer'),
+    hint('pad', 'Ⓐ choisir · Ⓨ relancer'),
   );
 
   return {
     el,
+    owner: opts.owner,
     onMount() {
       // Courte sécurité pour éviter un choix involontaire si une touche était déjà enfoncée.
       el.classList.add('locked');

@@ -1,11 +1,13 @@
 // Pile d'écrans d'interface + navigation spatiale au clavier / à la manette.
 import type { AudioManager } from '../engine/Audio';
-import type { Action, Input } from '../engine/Input';
+import type { Action, Controller, Input } from '../engine/Input';
 
 export interface Screen {
   el: HTMLElement;
   /** Échap / bouton B. */
   onBack?(): void;
+  /** Bouton Start / touche Pause ; par défaut, comme Retour. */
+  onPause?(): void;
   /** Raccourcis clavier propres à l'écran ; renvoyer true si la touche est utilisée. */
   onKey?(e: KeyboardEvent): boolean;
   onMount?(): void;
@@ -14,6 +16,8 @@ export interface Screen {
   onResume?(): void;
   /** Touche / bouton « relancer » (R, Y). */
   onReroll?(): void;
+  /** Coop locale : écran réservé à un joueur (son choix de bonus) ; le clavier et les autres manettes sont ignorés. */
+  owner?: Controller;
 }
 
 interface Entry {
@@ -26,16 +30,20 @@ export class UIManager {
 
   constructor(
     private readonly root: HTMLElement,
-    input: Input,
+    private readonly input: Input,
     private readonly audio: AudioManager,
   ) {
-    input.onAction((action, event) => this.onAction(action, event));
+    input.onAction((action, event, source) => this.onAction(action, event, source));
     input.onKey((e) => {
       const top = this.top;
-      if (top?.onKey?.(e)) e.preventDefault();
+      if (!top?.onKey || !this.accepts({ type: 'keyboard' }) || !top.onKey(e)) return false;
+      e.preventDefault();
+      return true;
     });
-    // La souris déplace aussi le focus : clavier et souris restent synchronisés.
-    root.addEventListener('mouseover', (e) => {
+    // La souris déplace aussi le focus : clavier et souris restent synchronisés. Seulement quand elle
+    // bouge vraiment : un écran reconstruit sous le curseur immobile (« mouseover » sans mouvement)
+    // ne doit pas voler le focus du clavier ou de la manette.
+    root.addEventListener('mousemove', (e) => {
       const target = (e.target as HTMLElement).closest<HTMLElement>('[data-nav]');
       if (target && target !== document.activeElement && this.isInTop(target)) target.focus({ preventScroll: true });
     });
@@ -59,6 +67,16 @@ export class UIManager {
 
   private isInTop(el: HTMLElement): boolean {
     return !!this.top && this.top.el.contains(el);
+  }
+
+  /** Le clavier ou la manette `source` peut-il commander l'écran du dessus ? */
+  private accepts(source: Controller): boolean {
+    const owner = this.top?.owner;
+    if (!owner || owner.type === 'any') return true;
+    // Manette du joueur débranchée : n'importe qui peut répondre à sa place (évite un blocage).
+    if (owner.type === 'pad' && !this.input.connectedPads().includes(owner.index)) return true;
+    if (owner.type === 'pad') return source.type === 'pad' && source.index === owner.index;
+    return source.type === owner.type;
   }
 
   push(screen: Screen): void {
@@ -111,9 +129,14 @@ export class UIManager {
     preferred?.focus({ preventScroll: true });
   }
 
-  private onAction(action: Action, event?: KeyboardEvent): boolean {
+  private onAction(action: Action, event?: KeyboardEvent, source?: Controller): boolean {
     const top = this.top;
     if (!top) return false;
+    if (source && !this.accepts(source)) {
+      // Pas de clic natif (Entrée sur un bouton) à la place du joueur concerné.
+      event?.preventDefault();
+      return true;
+    }
     const active = document.activeElement as HTMLElement | null;
     switch (action) {
       case 'up':
@@ -141,8 +164,11 @@ export class UIManager {
         }
         return true;
       case 'back':
-      case 'pause':
         top.onBack?.();
+        return true;
+      case 'pause':
+        if (top.onPause) top.onPause();
+        else top.onBack?.();
         return true;
       case 'reroll':
         top.onReroll?.();

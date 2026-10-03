@@ -9,5 +9,6 @@ if errorlevel 1 (
   echo La compilation a echoue.
 ) else (
   echo Compilation terminee : lancez Jouer.bat
+  if exist "release\NuitEternelle.exe" echo Jouer.bat lance la version .exe : relancez Creer-exe.bat pour y inclure ces changements.
 )
 pause
