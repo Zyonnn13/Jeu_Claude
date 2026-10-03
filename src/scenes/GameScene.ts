@@ -58,10 +58,11 @@ export class GameScene implements Scene {
     this.world = new World(
       {
         mode: config.mode,
-        heroes: config.players.map((p, i) => ({
+        heroes: config.players.map((p) => ({
           character: (CHARACTERS as Record<string, CharacterDef>)[p.character] ?? CHARACTERS.knight,
           name: p.name,
-          meta: i === 0 ? save.data.meta : (p.meta ?? {}),
+          // Améliorations permanentes : celles de cette sauvegarde pour tous les joueurs de ce PC, les leurs pour les invités en ligne.
+          meta: p.control.type === 'remote' ? (p.meta ?? {}) : save.data.meta,
           netId: p.control.type === 'remote' ? p.control.id : null,
         })),
         biome: getBiome(config.biome),
