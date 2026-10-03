@@ -331,7 +331,8 @@ async function scenarioGroupe() {
   const started = await until(g2, () => (window.game.scene.world?.heroViews?.length ?? 0) === 3 && (window.game.scene.world.hud?.director.title ?? '').startsWith('Survie'), undefined, 20000);
   check('Partie Survie à 3 joueurs lancée chez les invités', started);
   await sleep(3000);
-  await g1.screenshot({ path: path.join(process.env.SCREENSHOTS ?? ROOT, 'online-invite.png') }).catch(() => undefined);
+  // Capture d'écran d'un invité en partie, seulement si un dossier est indiqué (SCREENSHOTS=dossier).
+  if (process.env.SCREENSHOTS) await g1.screenshot({ path: path.join(process.env.SCREENSHOTS, 'online-invite.png') }).catch(() => undefined);
 
   // Bob tombe à terre, Alice vient le relever.
   await host.evaluate(() => {
