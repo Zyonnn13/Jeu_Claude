@@ -3,21 +3,53 @@
   "private": true,
   "version": "1.0.0",
   "description": "Roguelike survivor 2D en pixel art",
+  "author": "Nuit Eternelle",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "assets": "node tools/generate-assets.mjs"
+    "assets": "node tools/generate-assets.mjs",
+    "electron": "npm run build && electron .",
+    "exe": "npm run build && electron-builder --win portable --x64 --publish never"
   },
   "devDependencies": {
+    "@fontsource/pixelify-sans": "^5.3.0",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "peerjs": "^1.5.5",
     "typescript": "^5.9.3",
     "vite": "^8.3.2",
     "vite-plugin-singlefile": "^2.3.3"
   },
-  "dependencies": {
-    "@fontsource/pixelify-sans": "^5.3.0",
-    "peerjs": "^1.5.5"
+  "build": {
+    "appId": "com.nuiteternelle.game",
+    "productName": "Nuit Eternelle",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/index.html",
+      "electron/main.cjs",
+      "electron/icon.png",
+      "package.json"
+    ],
+    "asar": true,
+    "compression": "normal",
+    "npmRebuild": false,
+    "publish": null,
+    "electronLanguages": [
+      "fr",
+      "en-US"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "electron/icon.ico"
+    },
+    "portable": {
+      "artifactName": "NuitEternelle.exe"
+    }
   }
 }

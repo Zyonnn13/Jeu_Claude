@@ -1,0 +1,24 @@
+# Construit l'exe Windows (release/NuitEternelle.exe) à la demande (onglet Actions) ou pour chaque tag v*.
+name: Exe Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NuitEternelle
+          path: release/NuitEternelle.exe
+          if-no-files-found: error
